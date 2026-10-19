@@ -42,6 +42,16 @@
   #boot .t { font-family: var(--font-mono); letter-spacing: .4em; color: var(--muted); font-size: 14px; text-align: center; }
   #boot .bar { width: 220px; height: 2px; background: #1a1d29; margin: 14px auto 0; overflow: hidden; }
   #boot .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--neon-a), var(--neon-b)); transition: width .3s; }
+  /* ready: the bar goes away and a big pulsing prompt takes over, so it can't pass for "still loading" */
+  #boot.ready { cursor: pointer; }
+  #boot.ready .bar { opacity: 0; height: 0; margin: 0; transition: opacity .4s, height .4s, margin .4s; }
+  #boot .ok { color: var(--neon-b); font-size: 12px; letter-spacing: .5em; margin-bottom: 14px; text-shadow: 0 0 10px rgba(47,210,255,.5); }
+  #boot .go { font-family: var(--font-display); font-weight: 600; font-size: clamp(30px, 6vw, 56px); line-height: 1; letter-spacing: .26em; padding-left: .26em; color: #fff;
+    text-shadow: 0 0 10px var(--neon-a), 0 0 30px rgba(255,47,142,.6); animation: boot-in .6s ease-out both, boot-pulse 1.2s ease-in-out .6s infinite; }
+  #boot .sub { font-size: 11px; letter-spacing: .3em; color: var(--muted); opacity: .75; margin-top: 18px; }
+  @keyframes boot-in { 0% { opacity: 0; transform: scale(1.3); filter: brightness(3); } 55% { opacity: 1; } 100% { transform: none; filter: none; } }
+  @keyframes boot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; text-shadow: 0 0 4px rgba(255,47,142,.4); } }
+  @media (prefers-reduced-motion: reduce) { #boot .go { animation: none; } }
   .touch { position: absolute; inset: auto 0 0 0; height: 0; pointer-events: none; z-index: 20; }
   .touch button { pointer-events: auto; position: absolute; border: 1px solid rgba(255,255,255,.25); background: rgba(10,12,20,.45); color: #fff; font-family: var(--font-display); font-size: 20px; border-radius: 50%; width: 64px; height: 64px; backdrop-filter: blur(4px); touch-action: none; }
   .touch .pad { position: absolute; left: max(16px, env(safe-area-inset-left)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 190px; height: 190px; }
@@ -60,7 +70,7 @@
 <body>
 <div id="app"></div>
 <div id="ui"></div>
-<div id="boot"><div><div class="t">LOADING THE CITY</div><div class="bar"><i id="bootbar"></i></div></div></div>
+<div id="boot"><div><div class="t" role="status" aria-live="polite">LOADING THE CITY</div><div class="bar"><i id="bootbar"></i></div></div></div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

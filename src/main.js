@@ -143,7 +143,10 @@ async function start() {
   game.state = 'cinematic';
   renderer.fade = 1;
   // a gesture is required before audio can play: hold on a press-start screen
-  boot.querySelector('.t').innerHTML = 'CLICK OR PRESS ANY KEY<br><span style="opacity:.5;letter-spacing:.3em;font-size:11px">HEADPHONES RECOMMENDED</span>';
+  const touch = document.body.classList.contains('has-touch');
+  boot.classList.add('ready');
+  boot.querySelector('.t').innerHTML = `<div class="ok">READY</div><div class="go">${touch ? 'TAP TO START' : 'PRESS ANY KEY'}</div>`
+    + `<div class="sub">${touch ? '' : 'OR CLICK ANYWHERE · '}HEADPHONES RECOMMENDED</div>`;
   mode = 'press';
   window.__ready = true;
   if (q.has('autostart')) beginIntro();
