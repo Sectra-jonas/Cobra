@@ -1,0 +1,3 @@
+// Helpers injected via shot.py --eval for scripted play-tests.
+window.__keys = (code, ms) => { __input.keys.add(code); setTimeout(() => __input.keys.delete(code), ms); };
+window.__state = () => { const g = __game, p = g.player, b = p.body; return { x: +b.x.toFixed(2), y: +b.y.toFixed(2), onGround: b.onGround, climbing: b.climbing, hp: Math.round(p.hp), weapon: p.weapon, burgers: [...g.burgers], kills: g.kills, enemies: g.enemies.filter(e => e.alive).map(e => e.type + '@' + e.body.x.toFixed(1) + ',' + e.body.y.toFixed(1)), ingrid: g.ingrid.state, lives: g.lives, score: g.score, fps: Math.round(__fps) }; };

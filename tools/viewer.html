@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cobra Prop Viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0d12; color: #ddd; font: 13px system-ui, sans-serif; overflow: hidden; }
+  #info { position: fixed; left: 10px; top: 8px; z-index: 2; background: rgba(0,0,0,.5); padding: 6px 10px; border-radius: 4px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="info">loading…</div>
+<script type="module">
+// Usage: viewer.html?module=../src/props/city.js&only=streetLamp&mood=night|day|factory&cam=side|orbit
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const q = new URLSearchParams(location.search);
+const modPath = q.get('module') || '../src/props/city.js';
+const only = q.get('only');
+const mood = q.get('mood') || 'night';
+const info = document.getElementById('info');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = mood === 'day' ? 1.0 : 1.2;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = mood === 'day' ? 0.6 : 0.25;
+scene.background = new THREE.Color(mood === 'day' ? '#9fb6c9' : mood === 'factory' ? '#120c0a' : '#070a12');
+
+const hemi = new THREE.HemisphereLight(mood === 'day' ? '#cfe3ff' : '#3a4a78', mood === 'day' ? '#6b5a40' : '#140f18', mood === 'day' ? 1.2 : 0.6);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(mood === 'day' ? '#ffe2b8' : mood === 'factory' ? '#ff8a3c' : '#8fa8ff', mood === 'day' ? 3.2 : 1.2);
+sun.position.set(8, 14, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 80 });
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+const rim = new THREE.DirectionalLight(mood === 'day' ? '#ffffff' : '#ff3d8b', mood === 'day' ? 0.6 : 1.4);
+rim.position.set(-10, 6, -8);
+scene.add(rim);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: mood === 'day' ? '#6b6150' : '#1a1b20', roughness: 0.6, metalness: 0.0 }));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 1000);
+const controls = new OrbitControls(camera, renderer.domElement);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.7, 0.5, 0.85));
+composer.addPass(new OutputPass());
+
+const updaters = [];
+const lightPool = [];
+try {
+  const mod = await import(modPath);
+  const makers = Object.entries(mod).filter(([k, v]) => typeof v === 'function' && k.startsWith('make') && (!only || only.split(',').includes(k) || only.split(',').includes(k.replace(/^make/, '').replace(/^./, c => c.toLowerCase()))));
+  let x = 0;
+  const labels = [];
+  for (const [name, fn] of makers) {
+    const t0 = performance.now();
+    const g = fn({});
+    const bb = new THREE.Box3().setFromObject(g);
+    const size = bb.getSize(new THREE.Vector3());
+    g.position.x = x - bb.min.x;
+    scene.add(g);
+    if (g.userData.update) updaters.push(g.userData.update);
+    for (const L of g.userData.lights || []) {
+      const pl = new THREE.PointLight(L.color, L.intensity ?? 20, L.distance ?? 12, 2);
+      pl.position.copy(L.pos).add(g.position);
+      scene.add(pl);
+      lightPool.push(pl);
+    }
+    labels.push(`${name} (${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)}m, ${(performance.now() - t0).toFixed(0)}ms)`);
+    x += size.x + 2;
+  }
+  const total = new THREE.Box3().setFromObject(scene.children.filter(o => o.isGroup).reduce((acc, o) => { acc.add(o.clone()); return acc; }, new THREE.Group()));
+  const c = total.getCenter(new THREE.Vector3()), s = total.getSize(new THREE.Vector3());
+  const dist = Math.max(s.x * 0.9, s.y * 1.6, 8);
+  if ((q.get('cam') || 'side') === 'side') camera.position.set(c.x, c.y + s.y * 0.25 + 1, c.z + dist);
+  else camera.position.set(c.x + dist * 0.6, c.y + dist * 0.4, c.z + dist * 0.8);
+  controls.target.copy(c);
+  controls.update();
+  info.textContent = labels.join('  |  ') + `  |  lights: ${lightPool.length}`;
+} catch (e) {
+  info.textContent = 'ERROR: ' + e.message;
+  console.error(e);
+}
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  for (const u of updaters) u(dt, t);
+  controls.update();
+  composer.render();
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+window.__ready = true;
+</script>
+</body>
+</html>

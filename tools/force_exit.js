@@ -1,0 +1,1 @@
+(() => { const g = __game; g.burgers = new Set(['knife','pistol','smg','pill']); g.kills = g.def.quota; g.ingrid.appear({x: 283, y: 0}); g.player.spawnAt(285, 0); g.camRig.snap(285, 0); g.ingrid.startFollowing(); g.checkObjectives(); for (const e of g.builder.encounters) e.done = true; window.__keys('ArrowRight', 1500); return g.exitOpen; })()

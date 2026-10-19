@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cobra Audio Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #0b0d12; --panel: #141821; --line: #262c3a; --text: #d9dde6; --dim: #8a93a6; --pink: #ff2a6d; --cyan: #05d9e8; --amber: #ffb000; --ok: #3ddc84; --bad: #ff4d4d; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(11,13,18,.95); z-index: 2; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 18px; letter-spacing: .2em; color: var(--pink); text-shadow: 0 0 12px rgba(255,42,109,.6); }
+  h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .15em; color: var(--cyan); }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; padding: 12px 16px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+  section.wide { grid-column: 1 / -1; }
+  button { background: #1d2230; color: var(--text); border: 1px solid #323a4d; border-radius: 4px; padding: 6px 10px; cursor: pointer; font: inherit; margin: 0 4px 4px 0; }
+  button:hover { border-color: var(--cyan); }
+  button.on { background: #3a1426; border-color: var(--pink); }
+  button.big { background: var(--pink); color: #fff; border: 0; font-weight: 600; padding: 8px 16px; }
+  label { display: grid; grid-template-columns: 110px 1fr 44px; align-items: center; gap: 8px; margin: 4px 0; color: var(--dim); }
+  input[type=range] { width: 100%; accent-color: var(--pink); }
+  .grid { display: flex; flex-wrap: wrap; }
+  #status { color: var(--dim); }
+  #beat { width: 14px; height: 14px; border-radius: 50%; background: #333; display: inline-block; vertical-align: middle; transition: background .08s; }
+  #beat.hit { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+  table { border-collapse: collapse; width: 100%; font: 12px/1.3 ui-monospace, Consolas, monospace; }
+  th, td { padding: 3px 6px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+  td.ok { color: var(--ok); } td.warn { color: var(--amber); } td.fail { color: var(--bad); }
+  canvas.wf { width: 220px; height: 22px; display: block; }
+  .tablewrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>COBRA · AUDIO</h1>
+  <button class="big" id="unlock">Start audio</button>
+  <span id="status">locked</span>
+  <span><span id="beat"></span> <span id="mtime">0.0 s</span></span>
+</header>
+<main>
+  <section>
+    <h2>Music</h2>
+    <div class="grid" id="tracks"></div>
+    <button id="stop">Stop music</button>
+    <label>Fade (s) <input type="range" id="fade" min="0" max="4" step="0.1" value="1.5"><span>1.5</span></label>
+    <label>Intensity <input type="range" id="intensity" min="0" max="1" step="0.01" value="0.5"><span>0.50</span></label>
+  </section>
+  <section>
+    <h2>Mix &amp; FX</h2>
+    <label>Master <input type="range" id="master" min="0" max="1" step="0.01" value="1"><span>1.00</span></label>
+    <label>Music <input type="range" id="music" min="0" max="1" step="0.01" value="1"><span>1.00</span></label>
+    <label>SFX <input type="range" id="sfxv" min="0" max="1" step="0.01" value="1"><span>1.00</span></label>
+    <label>Slow-mo <input type="range" id="slow" min="0.1" max="1" step="0.01" value="1"><span>1.00</span></label>
+    <label>Muffle <input type="range" id="muffle" min="0" max="1" step="0.01" value="0"><span>0.00</span></label>
+    <button id="duck">Duck music</button>
+  </section>
+  <section>
+    <h2>Ambience</h2>
+    <div class="grid" id="ambs"></div>
+    <button id="thNear">Thunder near</button><button id="thFar">Thunder far</button>
+  </section>
+  <section class="wide">
+    <h2>SFX</h2>
+    <label>World x <input type="range" id="sx" min="-20" max="20" step="0.5" value="0"><span>0</span></label>
+    <label>Pitch <input type="range" id="pitch" min="0.5" max="2" step="0.01" value="1"><span>1.00</span></label>
+    <div class="grid" id="sfx"></div>
+    <button id="rapid">Rapid-fire mg + shells (2 s)</button>
+    <button id="walk">Walk (steps)</button>
+  </section>
+  <section class="wide" id="selftestSec" hidden>
+    <h2>Self-test (OfflineAudioContext)</h2>
+    <div id="stsum"></div>
+    <div class="tablewrap"><table id="st"><thead><tr><th>item</th><th>kind</th><th>render s</th><th>active s</th><th>peak</th><th>peak dB</th><th>rms dB</th><th>ms</th><th>waveform</th><th>status</th></tr></thead><tbody></tbody></table></div>
+  </section>
+</main>
+<script type="module">
+import audio, { TRACKS, SFX_NAMES, AMBIENCES, renderOffline } from '../src/core/audio.js';
+
+const $ = (id) => document.getElementById(id);
+const q = new URLSearchParams(location.search);
+audio.init();
+
+// --- interactive controls ---------------------------------------------------------------
+$('unlock').onclick = () => { audio.unlock(); };
+setInterval(() => {
+  $('status').textContent = audio.ready ? 'running' : 'locked (click Start audio)';
+  $('mtime').textContent = audio.musicTime().toFixed(1) + ' s';
+}, 100);
+audio.onBeat((beat, bar) => { const b = $('beat'); b.classList.add('hit'); b.title = `bar ${bar} beat ${beat}`; setTimeout(() => b.classList.remove('hit'), 90); });
+
+function slider(id, fn, digits = 2) {
+  const el = $(id), out = el.nextElementSibling;
+  const upd = () => { out.textContent = (+el.value).toFixed(digits); fn(+el.value); };
+  el.oninput = upd; upd();
+  return el;
+}
+slider('fade', () => {}, 1);
+slider('intensity', (v) => audio.setMusicIntensity(v));
+slider('master', (v) => audio.setMasterVolume(v));
+slider('music', (v) => audio.setMusicVolume(v));
+slider('sfxv', (v) => audio.setSfxVolume(v));
+slider('slow', (v) => audio.setSlowMo(v));
+slider('muffle', (v) => audio.setMuffle(v));
+slider('sx', () => {}, 1);
+slider('pitch', () => {});
+$('duck').onclick = () => audio.duck(0.7, 1);
+
+let curTrack = null;
+for (const name of TRACKS) {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.onclick = () => {
+    audio.unlock();
+    audio.playMusic(name, { fade: +$('fade').value });
+    curTrack = name;
+    for (const x of $('tracks').children) x.classList.toggle('on', x === b);
+  };
+  $('tracks').appendChild(b);
+}
+$('stop').onclick = () => { audio.stopMusic(+$('fade').value); for (const x of $('tracks').children) x.classList.remove('on'); };
+
+for (const name of [...AMBIENCES, null]) {
+  const b = document.createElement('button');
+  b.textContent = name || 'none';
+  b.onclick = () => { audio.unlock(); audio.setAmbience(name); for (const x of $('ambs').children) x.classList.toggle('on', x === b && !!name); };
+  $('ambs').appendChild(b);
+}
+$('thNear').onclick = () => { audio.unlock(); audio.thunder(0.05); };
+$('thFar').onclick = () => { audio.unlock(); audio.thunder(0.9); };
+
+const fire = (name, extra = {}) => audio.sfx(name, { x: +$('sx').value, pitch: +$('pitch').value, ...extra });
+for (const name of SFX_NAMES) {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.onclick = () => { audio.unlock(); fire(name); };
+  $('sfx').appendChild(b);
+}
+$('rapid').onclick = () => {
+  audio.unlock(); audio.sfx('laserOn');
+  let n = 0; const id = setInterval(() => { fire('mg'); if (n % 2) fire('shell', { volume: 0.6 }); if (++n >= 24) clearInterval(id); }, 85);
+};
+$('walk').onclick = () => {
+  audio.unlock();
+  let n = 0; const id = setInterval(() => { fire('step'); if (++n >= 12) clearInterval(id); }, 300);
+};
+addEventListener('pointerdown', () => audio.unlock(), { once: true });
+addEventListener('keydown', () => audio.unlock(), { once: true });
+
+// --- self-test --------------------------------------------------------------------------
+const SFX_LEN = { motorcycle: 3.5, carPass: 3.5, engineIdle: 3.8, explosion: 4.5, siren: 4, furnaceRoar: 4, impactBoom: 5, ingridTaken: 4, bossLaugh: 3.5, playerDie: 3, thunder: 9 };
+const MUSIC_LEN = { intro: 32, levelclear: 7, gameover: 9, victory: 24 };
+
+function drawWave(buf) {
+  const c = document.createElement('canvas'); c.className = 'wf'; c.width = 220; c.height = 22;
+  const g = c.getContext('2d'), d0 = buf.getChannelData(0), d1 = buf.getChannelData(1), n = buf.length, w = c.width, h = c.height;
+  g.fillStyle = '#05d9e8';
+  for (let x = 0; x < w; x++) {
+    let m = 0; const a = Math.floor(x * n / w), b = Math.floor((x + 1) * n / w);
+    for (let i = a; i < b; i += 4) { const v = Math.max(Math.abs(d0[i]), Math.abs(d1[i])); if (v > m) m = v; }
+    const y = Math.min(1, m) * h / 2;
+    g.fillRect(x, h / 2 - y, 1, Math.max(1, y * 2));
+  }
+  return c;
+}
+const db = (v) => (v > 0 ? (20 * Math.log10(v)).toFixed(1) : '-inf');
+
+async function selftest() {
+  $('selftestSec').hidden = false;
+  const errors = [];
+  const origErr = console.error;
+  console.error = (...a) => { errors.push(a.map(String).join(' ')); origErr.apply(console, a); };
+  addEventListener('error', (ev) => errors.push('window.onerror: ' + ev.message));
+
+  const items = [];
+  for (const n of SFX_NAMES) items.push(['sfx', n, SFX_LEN[n] || 2.5, {}]);
+  for (const n of TRACKS) items.push(['music', n, MUSIC_LEN[n] || 12, { intensity: 1 }]);
+  // intensity layering check on a main section (bar = start bar of the render)
+  for (const [n, bar] of [['city', 4], ['rural', 4], ['factory', 4], ['boss', 2]]) {
+    for (const x of [0, 0.5, 1]) items.push(['music', n, 8, { intensity: x, bar, label: `${n}@${x} b${bar}` }]);
+  }
+  for (const n of AMBIENCES) items.push(['amb', n, 6, {}]);
+  items.push(['thunder', 'thunder near', SFX_LEN.thunder, { distance: 0.05 }]);
+  items.push(['thunder', 'thunder far', SFX_LEN.thunder, { distance: 0.9 }]);
+
+  const tbody = document.querySelector('#st tbody');
+  const results = [];
+  let fails = 0, warns = 0;
+  const t0 = performance.now();
+  const run = async ([kind, name, len, opts]) => {
+    const label = opts.label || name;
+    const e0 = errors.length, s = performance.now();
+    let r, err = null;
+    try { r = await renderOffline(kind, name, len, opts); } catch (ex) { err = ex; }
+    const ms = performance.now() - s;
+    const threw = err || errors.length > e0;
+    let status = 'ok';
+    if (threw) status = 'FAIL threw: ' + (err ? err.message : errors.slice(e0).join(' | ').slice(0, 120));
+    else if (r.nan) status = 'FAIL NaN';
+    else if (r.peak > 1.0) status = 'FAIL clip';
+    else if (r.peak < 0.003 || r.rms < 1e-5) status = 'FAIL silent';
+    else if (r.peak < 0.03) status = 'WARN quiet';
+    else if (r.peak > 0.97) status = 'WARN hot';
+    if (status.startsWith('FAIL')) fails++; else if (status.startsWith('WARN')) warns++;
+    results.push({ kind, label, len, r, ms, status });
+    const tr = document.createElement('tr');
+    const cls = status === 'ok' ? 'ok' : status.startsWith('WARN') ? 'warn' : 'fail';
+    tr.innerHTML = `<td>${label}</td><td>${kind}</td><td>${len}</td><td>${r ? r.activeDur.toFixed(2) : '-'}</td><td>${r ? r.peak.toFixed(3) : '-'}</td>` +
+      `<td>${r ? db(r.peak) : '-'}</td><td>${r ? db(r.rms) : '-'}</td><td>${ms.toFixed(0)}</td><td></td><td class="${cls}">${status}</td>`;
+    if (r) tr.children[8].appendChild(drawWave(r.buffer));
+    tbody.appendChild(tr);
+    (window.__stlog ||= []).push(`${kind.padEnd(7)} ${label.padEnd(14)} active=${r ? r.activeDur.toFixed(2) : '-'}s peak=${r ? r.peak.toFixed(3) : '-'} rms=${r ? db(r.rms) : '-'}dB ${ms.toFixed(0)}ms ${status}`);
+    console.log(`[selftest] ${kind.padEnd(7)} ${label.padEnd(14)} len=${len}s active=${r ? r.activeDur.toFixed(2) : '-'}s peak=${r ? r.peak.toFixed(3) : '-'} (${r ? db(r.peak) : '-'} dB) rms=${r ? db(r.rms) : '-'} dB ${ms.toFixed(0)}ms ${status}`);
+  };
+  const CONC = 4;
+  for (let i = 0; i < items.length; i += CONC) await Promise.all(items.slice(i, i + CONC).map(run));
+
+  // live smoke test of the realtime singleton path
+  let live = 'skipped (context not running)';
+  audio.unlock();
+  await new Promise((r) => setTimeout(r, 300));
+  if (audio.ready) {
+    let beats = 0; const off = audio.onBeat(() => beats++);
+    const e0 = errors.length;
+    audio.setMusicIntensity(1);
+    audio.playMusic('city', { fade: 0.3 });
+    audio.setAmbience('rain', { fade: 0.2 });
+    for (const n of SFX_NAMES) audio.sfx(n, { volume: 0.2, x: Math.random() * 30 - 15 });
+    for (let i = 0; i < 40; i++) audio.sfx('mg');
+    audio.duck(0.5, 0.3); audio.setSlowMo(0.4); audio.setMuffle(0.5); audio.thunder(0.3);
+    await new Promise((r) => setTimeout(r, 1500));
+    audio.setSlowMo(1); audio.setMuffle(0);
+    audio.playMusic('boss', { fade: 0.5 });
+    await new Promise((r) => setTimeout(r, 1500));
+    const mt = audio.musicTime();
+    audio.stopMusic(0.3); audio.setAmbience(null, { fade: 0.2 }); off();
+    const ok = errors.length === e0 && beats > 0 && mt > 0.5;
+    live = `${ok ? 'ok' : 'FAIL'} – beats=${beats}, musicTime=${mt.toFixed(2)}s, errors=${errors.length - e0}`;
+    if (!ok) fails++;
+  }
+  const total = ((performance.now() - t0) / 1000).toFixed(1);
+  const summary = `${results.length} renders in ${total}s · ${fails} fail · ${warns} warn · live API: ${live}`;
+  $('stsum').textContent = summary;
+  console.log('[selftest] SUMMARY ' + summary);
+  (window.__stlog ||= []).push('SUMMARY ' + summary);
+  console.error = origErr;
+  window.__selftest = { results: results.map(({ kind, label, r, status }) => ({ kind, label, peak: r?.peak, rms: r?.rms, active: r?.activeDur, status })), fails, warns, live };
+  window.__ready = true;
+}
+
+// ?profile=<track>[&bar=8&len=8] – offline render cost per mixer channel (full minus muted)
+async function profile(name) {
+  $('selftestSec').hidden = false;
+  const bar = +(q.get('bar') || 8), len = +(q.get('len') || 8);
+  const timeIt = async (mute) => { const s = performance.now(); const r = await renderOffline('music', name, len, { intensity: 1, bar, mute }); return [performance.now() - s, r]; };
+  await timeIt([]);
+  const [full, rf] = await timeIt([]);
+  const probe = await renderOffline('music', name, 0.5, { intensity: 1, bar });
+  const lines = [`profile ${name} bar ${bar} len ${len}s: full ${full.toFixed(0)}ms (${(full / len / 10).toFixed(1)}% of realtime) rms ${db(rf.rms)}dB`];
+  const chans = Object.keys((await import('../src/core/audio.js')).SONG_MIX(name));
+  const [base] = await timeIt(chans);
+  lines.push(`  all channels muted (fixed bus/reverb cost): ${base.toFixed(0)}ms (${(base / len / 10).toFixed(1)}%)`);
+  for (const c of chans) {
+    const [ms, r] = await timeIt([c]);
+    lines.push(`  -${c.padEnd(8)} saves ${(full - ms).toFixed(0).padStart(5)}ms  rms without ${db(r.rms)}dB`);
+  }
+  const text = lines.join(String.fromCharCode(10));
+  $('stsum').innerHTML = '<pre>' + text + '</pre>';
+  console.log(text);
+  window.__stlog = lines;
+  window.__ready = true;
+}
+
+if (q.get('selftest')) selftest(); else if (q.get('profile')) profile(q.get('profile')); else window.__ready = true;
+</script>
+</body>
+</html>

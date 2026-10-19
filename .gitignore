@@ -1,0 +1,7 @@
+# build output of tools/build_artifact.py
+dist/
+
+# local tooling noise
+__pycache__/
+.playwright-cli/
+*.log

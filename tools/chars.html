@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cobra Character Lineup</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0d12; color: #ddd; font: 13px system-ui, sans-serif; overflow: hidden; }
+  #info { position: fixed; left: 10px; top: 8px; z-index: 2; background: rgba(0,0,0,.5); padding: 6px 10px; border-radius: 4px; white-space: pre; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="info">loading…</div>
+<script type="module">
+// chars.html?kinds=cobra,ingrid&anim=idle|run|walk|jump|fall|crouch|climb|aim|smg|throw|headbutt|punch|axe|tube|push|hurt|dead|cower|carried|victory|wave|carry
+//   &t=1.3 (freeze time) &zoom=1 &face=1 &ty=0.95 (look-at height) &yaw=rad (override root yaw)
+//   &cam=front|side|34|back (camera direction) &cy=height &light=night|studio &spacing=1.3 &gun=pistol|smg|none
+//   &tstep=0.05 (time offset per rig, e.g. kinds=cobra,cobra,cobra,cobra to see a cycle)
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { createCharacter, CHARACTER_KINDS } from '../src/actors/characters.js';
+import { Poses, emptyPose, layerUpper, copyPose, rimUniforms } from '../src/actors/rig.js';
+
+const q = new URLSearchParams(location.search);
+const kinds = (q.get('kinds') || CHARACTER_KINDS.join(',')).split(',');
+const anim = q.get('anim') || 'idle';
+const fixedT = q.has('t') ? parseFloat(q.get('t')) : null;
+const zoom = parseFloat(q.get('zoom') || '1');
+const face = parseFloat(q.get('face') || '1');
+const yawO = q.has('yaw') ? parseFloat(q.get('yaw')) : null;
+const camDir = q.get('cam') || 'front';
+const light = q.get('light') || 'night';
+const spacing = parseFloat(q.get('spacing') || '1.3');
+const gun = q.get('gun');
+const tstep = parseFloat(q.get('tstep') || '0'); // per-rig time offset: lineups of one kind show animation phases
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+if (light === 'studio') {
+  scene.background = new THREE.Color('#10131c');
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.35;
+  scene.add(new THREE.HemisphereLight('#6d82b8', '#1b1410', 0.9));
+  const key = new THREE.DirectionalLight('#ffe0c0', 2.6);
+  key.position.set(5, 8, 7);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  Object.assign(key.shadow.camera, { left: -15, right: 15, top: 6, bottom: -2 });
+  scene.add(key);
+  const rim = new THREE.DirectionalLight('#ff4aa0', 2.0);
+  rim.position.set(-6, 4, -6);
+  scene.add(rim);
+} else {
+  // night city: dark blue ambient, sodium key, magenta & cyan neon rims, neon-panel environment
+  scene.background = new THREE.Color('#070910');
+  const env = new THREE.Scene();
+  env.background = new THREE.Color('#05060a');
+  env.add(new THREE.Mesh(new THREE.BoxGeometry(20, 10, 20), new THREE.MeshBasicMaterial({ color: '#0b0c12', side: THREE.BackSide })));
+  for (const [c, i, pos, w, h] of [['#ff2a6d', 4, [-6, 2, -5], 4, 1.2], ['#2ad4ff', 4, [6, 1.5, -4], 3, 1], ['#ffa040', 3, [0, 4, 6], 6, 1.5], ['#7a5cff', 2, [-5, 1, 5], 3, 1]]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(i), side: THREE.DoubleSide }));
+    m.position.set(...pos); m.lookAt(0, 0, 0); env.add(m);
+  }
+  scene.environment = pmrem.fromScene(env, 0.04).texture;
+  scene.environmentIntensity = 0.6;
+  scene.add(new THREE.HemisphereLight('#3a4a7a', '#120c10', 0.55));
+  const key = new THREE.DirectionalLight('#ffc890', 2.2);
+  key.position.set(4, 7, 8);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.normalBias = 0.02;
+  Object.assign(key.shadow.camera, { left: -15, right: 15, top: 6, bottom: -2 });
+  scene.add(key);
+  const rimP = new THREE.DirectionalLight('#ff3a9a', 2.4);
+  rimP.position.set(-7, 3, -5);
+  scene.add(rimP);
+  const rimC = new THREE.DirectionalLight('#38c8ff', 1.6);
+  rimC.position.set(7, 2.5, -4);
+  scene.add(rimC);
+  rimUniforms.uRimColor.value.set('#5fb0ff');
+  rimUniforms.uRimStrength.value = 0.32;
+}
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshStandardMaterial({ color: '#1c1e24', roughness: 0.35, metalness: 0.1 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+const t0 = performance.now();
+const rigs = kinds.map((k, i) => {
+  const s = performance.now();
+  const r = createCharacter(k);
+  r.index = i;
+  r.buildMs = performance.now() - s;
+  r.root.position.x = (i - (kinds.length - 1) / 2) * spacing;
+  r.setFacing(face);
+  const g = gun || (k === 'cobra' && (anim === 'aim' || anim === 'run' || anim === 'idle') ? 'pistol' : k === 'cobra' && anim === 'smg' ? 'smg' : null);
+  if (k === 'cobra' && g && g !== 'none') r.show(g, true);
+  scene.add(r.root);
+  return r;
+});
+const buildMs = performance.now() - t0;
+
+const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.02, 200);
+const width = kinds.length * spacing;
+const dist = Math.max(4.2, width * 1.55) / zoom;
+const ty = q.has('ty') ? parseFloat(q.get('ty')) : 0.95;
+const dirs = { front: [0, 1], side: [1, 0], '34': [0.6, 0.8], back: [0, -1], left: [-1, 0], '34l': [-0.6, 0.8] };
+const dv = dirs[camDir] || dirs.front;
+camera.position.set(dv[0] * dist, q.has('cy') ? parseFloat(q.get('cy')) : 1.2 + (ty - 0.95), dv[1] * dist);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, ty, 0);
+// explicit framing: &campos=x,y,z&look=x,y,z (world space)
+if (q.has('campos')) camera.position.set(...q.get('campos').split(',').map(Number));
+if (q.has('look')) controls.target.set(...q.get('look').split(',').map(Number));
+if (q.has('fov')) { camera.fov = parseFloat(q.get('fov')); camera.updateProjectionMatrix(); }
+controls.update();
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.4, 0.9));
+composer.addPass(new OutputPass());
+
+const target = emptyPose();
+const clock = new THREE.Clock();
+let simT = 0;
+function poseFor(r, t) {
+  t += r.index * tstep;
+  for (const k in target) target[k] = 0;
+  const f = r.facing;
+  switch (anim) {
+    case 'run': Poses.run(target, t * 2 * Math.PI * 2.2, 1); if (r.kind === 'cobra') layerUpper(target, Poses.aimPistol(copyPose({}, target), f, 0), 1); break;
+    case 'runfree': Poses.run(target, t * 2 * Math.PI * 2.2, 1); break;
+    case 'walk': Poses.walk(target, t * 2 * Math.PI * 1.1, 1); break;
+    case 'jump': Poses.jump(target, 10); break;
+    case 'apex': Poses.jump(target, 0); break;
+    case 'jumparc': Poses.jump(target, 14 - (t % 1) * 28); break;
+    case 'fall': Poses.jump(target, -8); break;
+    case 'crouch': Poses.crouch(target, t); break;
+    case 'climb': Poses.climb(target, t * 6); break;
+    case 'aim': Poses.idle(target, t); Poses.aimPistol(target, f, 0); break;
+    case 'smg': Poses.idle(target, t); Poses.aimSMG(target, f, 0); break;
+    case 'throw': Poses.idle(target, t); Poses.throwArm(target, f, (t % 1)); break;
+    case 'headbutt': Poses.idle(target, t); Poses.headbutt(target, (t % 1)); break;
+    case 'punch': Poses.idle(target, t); Poses.punch(target, (t % 1), f); break;
+    case 'axe': Poses.idle(target, t); Poses.axeSwing(target, (t % 1.2) / 1.2, f); break;
+    case 'tube': Poses.idle(target, t); Poses.shoulderTube(target, f); break;
+    case 'push': Poses.walk(target, t * 6, 0.7); Poses.push(target); break;
+    case 'carry': Poses.walk(target, t * 6, 0.7); Poses.carry(target); break;
+    case 'hurt': Poses.idle(target, t); Poses.hurt(target, 0); break;
+    case 'dead': Poses.dead(target, Math.min(1, t)); break;
+    case 'cower': Poses.cower(target, t); break;
+    case 'carried': Poses.carried(target, t); break;
+    case 'victory': Poses.idle(target, t); Poses.victory(target, t); break;
+    case 'wave': Poses.idle(target, t); Poses.wave(target, t); break;
+    case 'rest': break;
+    default: Poses.idle(target, t, r.kind === 'cobra' ? 1 : 0);
+  }
+  return target;
+}
+function frame(dt) {
+  simT += dt;
+  const t = fixedT !== null ? fixedT : simT;
+  for (const r of rigs) {
+    r.update(dt, poseFor(r, t), fixedT !== null ? 60 : 14, yawO);
+    if (anim === 'run' || anim === 'runfree' || anim === 'walk') {
+      // keep the rig in place, but feed velocity to the secondary motion
+    }
+  }
+}
+if (fixedT !== null) for (let i = 0; i < 120; i++) frame(1 / 60);
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (fixedT === null) frame(dt); else frame(0);
+  controls.update();
+  composer.render();
+});
+const stats = rigs.map((r) => {
+  let calls = 0, tris = 0;
+  r.root.traverse((o) => { if (o.isMesh && o.visible) { calls++; const g = o.geometry; tris += (g.index ? g.index.count : g.attributes.position.count) / 3; } });
+  const tm = r.timings ? Object.entries(r.timings).map(([k, v]) => `${k} ${Math.round(v)}`).join(' ') : '';
+  return `${r.kind}: ${Math.round(tris / 100) / 10}k tris, ${calls} meshes, ${Math.round(r.buildMs)} ms  [${tm}]`;
+});
+document.getElementById('info').textContent = `${kinds.join(', ')} — ${anim}  (build ${Math.round(buildMs)} ms)\n` + stats.join('\n');
+window.__stats = stats;
+window.__rigs = rigs;
+window.__THREE = THREE;
+window.__ready = true;
+</script>
+</body>
+</html>
