@@ -10,22 +10,28 @@ export class Traffic {
     this.cfg = cfg;
     this.cars = [];
     this.t = 3 + Math.random() * 4;
-    this.protos = {};
+    // A car model costs 25-140 ms to generate, so the whole fleet is built with the level
+    // (two of each kind for variety) and spawning only ever hands out a parked car.
+    this.pool = [];
+    for (const kind of new Set(cfg.kinds)) {
+      const f = game.props?.[kind];
+      if (!f) continue;
+      for (let i = 0; i < 2; i++) {
+        const car = f({ seed: Math.floor(Math.random() * 50), headlights: true });
+        car.userData.kind = kind;
+        car.userData.setLights?.(!!cfg.lights);
+        car.userData.wheels = ['wheelFL', 'wheelFR', 'wheelRL', 'wheelRR'].map((n) => car.getObjectByName(n)).filter(Boolean);
+        car.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+        this.pool.push(car);
+      }
+    }
   }
 
   make(kind) {
-    const g = this.game;
-    const f = g.props?.[kind];
-    if (!f) return null;
-    if (!this.protos[kind]) this.protos[kind] = [];
-    const pool = this.protos[kind];
-    const free = pool.find((c) => !c.userData.busy);
-    if (free) return free;
-    const car = f({ seed: Math.floor(Math.random() * 50), headlights: true });
-    car.userData.setLights?.(!!this.cfg.lights);
-    car.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    pool.push(car);
-    return car;
+    const free = this.pool.filter((c) => !c.userData.busy);
+    const same = free.filter((c) => c.userData.kind === kind);
+    const from = same.length ? same : free;
+    return from.length ? from[Math.floor(Math.random() * from.length)] : null;
   }
 
   update(dt) {
@@ -47,8 +53,9 @@ export class Traffic {
         car.visible = true;
         g.scene.add(car);
         const speed = (lane.speed || 14) * (0.85 + Math.random() * 0.3);
-        this.cars.push({ car, dir: lane.dir, speed, life: 0, siren: kind === 'makePoliceCar' });
-        sound.sfx(kind === 'makePoliceCar' && Math.random() < 0.6 ? 'siren' : 'carPass', { x: car.position.x, volume: 0.55 });
+        const police = car.userData.kind === 'makePoliceCar';
+        this.cars.push({ car, dir: lane.dir, speed, life: 0, siren: police });
+        sound.sfx(police && Math.random() < 0.6 ? 'siren' : 'carPass', { x: car.position.x, volume: 0.55 });
       }
     }
     for (const c of this.cars) {
@@ -56,7 +63,7 @@ export class Traffic {
       const dx = c.dir * c.speed * dt;
       c.car.position.x += dx;
       if (c.car.userData.rollBy) c.car.userData.rollBy(Math.abs(dx));
-      else for (const n of ['wheelFL', 'wheelFR', 'wheelRL', 'wheelRR']) { const w = c.car.getObjectByName(n); if (w) w.rotation.z -= Math.abs(dx) / 0.35; }
+      else for (const w of c.car.userData.wheels) w.rotation.z -= Math.abs(dx) / 0.35;
       c.car.userData.update?.(dt, g.time);
       if (this.cfg.spray && Math.random() < 0.8) {
         const back = c.car.position.x - c.dir * 2.3;

@@ -231,6 +231,10 @@ export class Renderer {
 
   resize() {
     const w = this.container.clientWidth, h = this.container.clientHeight;
+    // cached CSS size: reading clientWidth/Height every frame forces a synchronous style +
+    // layout pass right after the HUD's DOM writes
+    this.width = w;
+    this.height = h;
     this.gl.setPixelRatio(this.pixelRatio);
     this.gl.setSize(w, h);
     this.composer.setPixelRatio(this.pixelRatio);
@@ -297,21 +301,27 @@ export class Renderer {
     this.trackPerformance(dt);
   }
 
-  // Dynamic resolution: step pixel ratio down when frames are slow, back up when fast.
+  // Dynamic resolution: step pixel ratio down when frames are slow, back up when fast. Every
+  // step reallocates the render targets (a small hitch and a visible resolution change), so it
+  // follows sustained trends only: one slow window (median of 90 frames) steps down, stepping up
+  // needs three fast windows in a row and never comes within 15 s of a step down (no ping-pong).
   trackPerformance(dt) {
     if (!this.autoQuality || this.time < 4) return;
     this.frameTimes.push(dt);
     if (this.frameTimes.length < 90) return;
     const sorted = this.frameTimes.slice().sort((a, b) => a - b);
-    const avg = sorted[Math.floor(sorted.length * 0.5)];
+    const med = sorted[Math.floor(sorted.length * 0.5)];
     this.frameTimes.length = 0;
+    this.fastWindows = med < 1 / 58 ? (this.fastWindows || 0) + 1 : 0;
     if (this.time - this.lastQualityChange < 3) return;
     let next = this.pixelRatio;
-    if (avg > 1 / 45) next = Math.max(0.6, this.pixelRatio - 0.15);
-    else if (avg < 1 / 58 && this.pixelRatio < this.maxPixelRatio) next = Math.min(this.maxPixelRatio, this.pixelRatio + 0.1);
+    if (med > 1 / 45) next = Math.max(0.6, this.pixelRatio - 0.15);
+    else if (this.fastWindows >= 3 && this.pixelRatio < this.maxPixelRatio && this.time - (this.lastDrop ?? -1e9) > 15) next = Math.min(this.maxPixelRatio, this.pixelRatio + 0.1);
     if (Math.abs(next - this.pixelRatio) > 0.01) {
+      if (next < this.pixelRatio) this.lastDrop = this.time;
       this.pixelRatio = next;
       this.lastQualityChange = this.time;
+      this.fastWindows = 0;
       this.resize();
     }
   }

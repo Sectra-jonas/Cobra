@@ -53,6 +53,25 @@ function scorchTexture() {
   return scorchTex;
 }
 
+function scorchMesh(radius) {
+  return new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.6, radius * 1.2), new THREE.MeshBasicMaterial({ map: scorchTexture(), transparent: true, depthWrite: false, color: '#000000', opacity: 0.9, polygonOffset: true, polygonOffsetFactor: -2 }));
+}
+
+// One of everything projectiles put in the scene, for Game.warmGpu: the first knife, rocket
+// or explosion of a level must not build a model, compile a shader or upload a mesh.
+export function projectileWarmSet() {
+  knifeProto ||= Gear.makeThrownKnife();
+  axeProto ||= Gear.makeAxe();
+  rocketProto ||= Gear.makeRocket();
+  bombProto ||= Gear.makeBomb();
+  grenadeProto ||= Gear.makeGrenade();
+  const g = new THREE.Group();
+  for (const p of [knifeProto, axeProto, rocketProto, bombProto, grenadeProto]) g.add(p.clone());
+  g.traverse((c) => { if (c.isMesh) c.castShadow = true; });
+  g.add(new THREE.Mesh(_tracerGeo, tracerMats.player), new THREE.Mesh(_tracerGeo, tracerMats.enemy), scorchMesh(1));
+  return g;
+}
+
 export class Projectiles {
   constructor(game) {
     this.game = game;
@@ -71,7 +90,7 @@ export class Projectiles {
     const g = this.game;
     const gy = g.world.groundAt(x, y + 0.5);
     if (!isFinite(gy) || y - gy > 2) return;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.6, radius * 1.2), new THREE.MeshBasicMaterial({ map: scorchTexture(), transparent: true, depthWrite: false, color: '#000000', opacity: 0.9, polygonOffset: true, polygonOffsetFactor: -2 }));
+    const m = scorchMesh(radius);
     m.rotation.x = -Math.PI / 2;
     m.rotation.z = Math.random() * 6;
     m.position.set(x, gy + 0.02, 0.3);

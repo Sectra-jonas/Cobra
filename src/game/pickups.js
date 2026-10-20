@@ -22,6 +22,46 @@ function beamMesh(color) {
   return new THREE.Mesh(geo, mat);
 }
 
+const crateGeo = new THREE.BoxGeometry(0.6, 0.38, 0.4), bandGeo = new THREE.BoxGeometry(0.62, 0.06, 0.42);
+const crateMat = new THREE.MeshStandardMaterial({ color: '#3d4a2a', roughness: 0.6, metalness: 0.2 });
+const bandMat = new THREE.MeshStandardMaterial({ color: '#c79a16' });
+crateGeo.userData.shared = bandGeo.userData.shared = true;
+
+function buildModel(kind) {
+  let model, beam = null;
+  if (kind === 'burger') {
+    burgerProto ||= makeBurger(1);
+    model = burgerProto.clone();
+    beam = beamMesh('#ffb347');
+  } else if (kind === 'grenades') {
+    const crate = new THREE.Mesh(crateGeo, crateMat);
+    crate.position.y = 0.19;
+    const band = new THREE.Mesh(bandGeo, bandMat);
+    band.position.y = 0.3;
+    model = new THREE.Group();
+    model.add(crate, band);
+  } else {
+    const s = new THREE.Mesh(new THREE.TorusKnotGeometry(0.18, 0.06, 64, 8, 2, 3), new THREE.MeshStandardMaterial({ color: '#1b6b2a', emissive: '#2dff5a', emissiveIntensity: 1.5, roughness: 0.3, metalness: 0.4 }));
+    s.position.y = 0.45;
+    model = new THREE.Group();
+    model.add(s);
+    beam = beamMesh('#45ff7a');
+  }
+  return { model, beam };
+}
+
+// Every pickup model, for Game.warmGpu (grenade crates drop from enemies mid-fight).
+export function pickupWarmSet() {
+  const g = new THREE.Group();
+  for (const k of ['burger', 'grenades', 'life']) {
+    const { model, beam } = buildModel(k);
+    model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    g.add(model);
+    if (beam) g.add(beam);
+  }
+  return g;
+}
+
 export class Pickup {
   constructor(game, kind, x, y, opts = {}) {
     this.game = game;
@@ -32,32 +72,12 @@ export class Pickup {
     this.t = Math.random() * 6;
     this.taken = false;
     this.group = new THREE.Group();
-    if (kind === 'burger') {
-      burgerProto ||= makeBurger(1);
-      const b = burgerProto.clone();
-      b.scale.setScalar(1.0);
-      this.model = b;
-      this.group.add(b);
-      this.beam = beamMesh('#ffb347');
-      this.group.add(this.beam);
-      this.light = game.lights.addSource({ pos: new THREE.Vector3(x, y + 0.8, 0.8), color: '#ffb347', intensity: 14, distance: 5, pulse: 3 });
-    } else if (kind === 'grenades') {
-      const crate = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.38, 0.4), new THREE.MeshStandardMaterial({ color: '#3d4a2a', roughness: 0.6, metalness: 0.2 }));
-      crate.position.y = 0.19;
-      const band = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.06, 0.42), new THREE.MeshStandardMaterial({ color: '#c79a16' }));
-      band.position.y = 0.3;
-      this.model = new THREE.Group();
-      this.model.add(crate, band);
-      this.group.add(this.model);
-    } else if (kind === 'life') {
-      const s = new THREE.Mesh(new THREE.TorusKnotGeometry(0.18, 0.06, 64, 8, 2, 3), new THREE.MeshStandardMaterial({ color: '#1b6b2a', emissive: '#2dff5a', emissiveIntensity: 1.5, roughness: 0.3, metalness: 0.4 }));
-      s.position.y = 0.45;
-      this.model = new THREE.Group();
-      this.model.add(s);
-      this.group.add(this.model);
-      this.beam = beamMesh('#45ff7a');
-      this.group.add(this.beam);
-    }
+    const { model, beam } = buildModel(kind);
+    this.model = model;
+    this.beam = beam;
+    this.group.add(model);
+    if (beam) this.group.add(beam);
+    if (kind === 'burger') this.light = game.lights.addSource({ pos: new THREE.Vector3(x, y + 0.8, 0.8), color: '#ffb347', intensity: 14, distance: 5, pulse: 3 });
     this.group.position.set(x, y, 0);
     this.group.traverse((o) => { if (o.isMesh && o !== this.beam) o.castShadow = true; });
     game.scene.add(this.group);

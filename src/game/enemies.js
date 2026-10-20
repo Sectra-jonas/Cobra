@@ -38,15 +38,41 @@ function giveRig(rig) {
   if (!rigPool.has(rig.kind)) rigPool.set(rig.kind, []);
   rigPool.get(rig.kind).push(rig);
 }
-export function prewarmRigs(kinds, n = 2) {
-  for (const k of kinds) {
-    const rigs = [];
-    for (let i = 0; i < n; i++) rigs.push(takeRig(k));
-    for (const r of rigs) giveRig(r);
-  }
-}
+export function freeRigs(type) { return rigPool.get(ENEMY_TYPES[type]?.char)?.length || 0; }
 
 let pramProto = null, bikeProto = null;
+
+// Builds everything enemies can bring into the scene before play starts (a character costs
+// 15-25 ms to generate, a bike or pram 15 ms): a rig pool per type sized for the biggest
+// encounter on top of its share of the ambient crowd (they overlap: encounters lock the
+// camera while ambient spawns continue), +1 for a corpse still fading out, plus the bike and
+// pram models. `extra`: further spawns the level can trigger (boss summons), one rig each.
+// Returns the rigs and extra models so the game can make them GPU-resident too.
+export function prewarmEnemies(game, extra = []) {
+  const def = game.def;
+  const need = new Map();
+  const total = def.enemyPool.reduce((s, [, w]) => s + w, 0) || 1;
+  const crowd = (def.maxAlive ?? 4) + 3;
+  for (const enc of game.builder.encounters) {
+    const n = new Map();
+    for (const s of enc.spawns) n.set(s.type, (n.get(s.type) || 0) + 1);
+    for (const [t, c] of n) need.set(t, Math.max(need.get(t) || 0, c));
+  }
+  for (const [t, w] of def.enemyPool) need.set(t, (need.get(t) || 0) + Math.ceil((w / total) * crowd));
+  for (const t of extra) need.set(t, (need.get(t) || 0) + 1);
+  const rigs = [], models = [];
+  for (const [t, n] of need) {
+    const cfg = ENEMY_TYPES[t];
+    if (!cfg) continue;
+    if (!rigPool.has(cfg.char)) rigPool.set(cfg.char, []);
+    const pool = rigPool.get(cfg.char);
+    while (pool.length < n + 1) pool.push(createCharacter(cfg.char));
+    rigs.push(...pool);
+    if (cfg.behavior === 'pram') models.push(pramProto ||= game.props?.makePram ? game.props.makePram() : fallbackPram());
+    if (cfg.behavior === 'biker') models.push(bikeProto ||= game.props?.makeMotorcycle ? game.props.makeMotorcycle() : fallbackBike());
+  }
+  return { rigs, extra: models };
+}
 
 export class Enemy {
   constructor(game, type, x, y, opts = {}) {
@@ -86,13 +112,13 @@ export class Enemy {
   }
 
   makePram() {
-    if (!pramProto) pramProto = this.game.props?.makePram ? this.game.props.makePram() : fallbackPram();
+    pramProto ||= this.game.props?.makePram ? this.game.props.makePram() : fallbackPram();
     this.pram = pramProto.clone();
     this.game.scene.add(this.pram);
   }
 
   makeBike(dir) {
-    if (!bikeProto) bikeProto = this.game.props?.makeMotorcycle ? this.game.props.makeMotorcycle() : fallbackBike();
+    bikeProto ||= this.game.props?.makeMotorcycle ? this.game.props.makeMotorcycle() : fallbackBike();
     this.bike = bikeProto.clone();
     this.game.scene.add(this.bike);
     this.facing = dir;

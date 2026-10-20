@@ -67,6 +67,27 @@ function chromeBandNormal() {
   return t;
 }
 
+// The sweep as one extra point light (range 4, decay 2) evaluated by the material itself.
+const sweepU = { uSweepPos: { value: new THREE.Vector3() }, uSweepColor: { value: new THREE.Color(0, 0, 0) } };
+function litBySweep(mat) {
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, sweepU);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uSweepPos;\nuniform vec3 uSweepColor;')
+      .replace('#include <lights_fragment_end>', `{
+          IncidentLight sweepLight;
+          vec3 sweepVec = uSweepPos - geometryPosition;
+          float sweepDist = length(sweepVec);
+          sweepLight.direction = sweepVec / max(sweepDist, 1e-4);
+          sweepLight.color = uSweepColor * getDistanceAttenuation(sweepDist, 4.0, 2.0);
+          sweepLight.visible = true;
+          RE_Direct(sweepLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
+        }
+        #include <lights_fragment_end>`);
+  };
+  mat.customProgramCacheKey = () => 'logoSweep';
+}
+
 export function makeLogo({ text = 'COBRA', height = 1, depth = 0.22, slant = 0.22, gap = 0.08, renderer = null } = {}) {
   const group = new THREE.Group();
   group.name = 'cobraLogo';
@@ -104,13 +125,22 @@ export function makeLogo({ text = 'COBRA', height = 1, depth = 0.22, slant = 0.2
   line2.position.y = -0.69;
   line2.scale.x = 0.7;
   group.add(line2);
-  // key + sweep lights travel with the logo
-  const key = new THREE.PointLight('#ffffff', 0, 6, 2);
-  key.position.set(-1.5, 1.2, 1.6);
-  group.add(key);
-  const sweep = new THREE.PointLight('#ff4aa0', 0, 4, 2);
+  // key + sweep "lights" travel with the logo. They are not real lights: the scene's light
+  // count is part of every shader program, so lights that come and go with the logo would need
+  // a second set of programs for the whole level (~10 s of compiles). The sweep is shaded in
+  // the letters' own shader instead, with three's point-light code; the key was always dark.
+  const key = new THREE.Object3D();
+  key.intensity = 0;
+  const sweep = new THREE.Object3D();
+  sweep.color = new THREE.Color('#ff4aa0');
+  sweep.intensity = 0;
   sweep.position.set(-width, 0.2, 0.9);
-  group.add(sweep);
+  group.add(key, sweep);
+  for (const mat of [chrome, sides]) litBySweep(mat);
+  for (const L of letters) L.mesh.onBeforeRender = (r, s, camera) => {
+    sweepU.uSweepPos.value.setFromMatrixPosition(sweep.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
+    sweepU.uSweepColor.value.copy(sweep.color).multiplyScalar(sweep.intensity);
+  };
   group.scale.setScalar(height);
   group.userData = { letters, width, line, line2, sweep, key, chrome, sides };
   return group;

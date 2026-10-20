@@ -24,8 +24,8 @@ const CSS = `
 #hud.hidden { opacity: 0; }
 #hud { transition: opacity .6s; }
 .hud-bottom { position: absolute; left: max(18px, env(safe-area-inset-left)); right: max(18px, env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
-.panel { position: relative; background: linear-gradient(180deg, rgba(12,14,24,.78), rgba(6,7,12,.86)); border: 1px solid rgba(120,200,255,.18); box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 8px 30px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06); transform: skewX(-12deg); padding: 6px 14px; border-radius: 3px; }
-.panel > .in { transform: skewX(12deg); display: flex; align-items: center; gap: 10px; }
+.panel { position: relative; background: linear-gradient(180deg, rgba(12,14,24,.78), rgba(6,7,12,.86)); border: 1px solid rgba(120,200,255,.18); box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 8px 30px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06); transform: skewX(-12deg); padding: 6px 14px; border-radius: 3px; will-change: transform; }
+.panel > .in { transform: skewX(12deg); display: flex; align-items: center; gap: 10px; will-change: transform; }
 .panel::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, var(--neon-a), var(--neon-b)); opacity: .9; }
 .lives svg { width: 34px; height: 34px; filter: drop-shadow(0 0 6px rgba(80,255,120,.45)); transition: transform .3s, opacity .3s; }
 .lives .lost { opacity: .12; transform: scale(.8); filter: grayscale(1); }
@@ -41,18 +41,19 @@ const CSS = `
 .quack { display: flex; align-items: center; gap: 8px; min-width: 190px; }
 .quack svg { width: 36px; height: 36px; transition: transform .2s; }
 .quack .bar { flex: 1; height: 10px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
-.quack .fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ff9d1c, #ffe14d); box-shadow: 0 0 10px rgba(255,210,40,.7); transition: width .15s linear; }
+.quack .fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff9d1c, #ffe14d); box-shadow: 0 0 10px rgba(255,210,40,.7); transform: scaleX(0); transform-origin: left; transition: transform .15s linear; will-change: transform; }
 .quack.low .fill { background: linear-gradient(90deg, #ff2b4a, #ff7a1a); animation: blink .4s steps(2) infinite; }
 .quack .lbl { font-size: 16px; letter-spacing: .12em; color: rgba(255,255,255,.55); position: absolute; top: -18px; left: 56px; }
 .quack.empty { opacity: .45; }
 .health { display: flex; align-items: center; gap: 10px; }
 .burgerhp { width: 52px; height: 52px; position: relative; }
 .burgerhp svg { width: 52px; height: 52px; position: absolute; inset: 0; transition: clip-path .25s; filter: drop-shadow(0 0 6px rgba(255,170,60,.35)); }
+#h-burger { position: absolute; inset: 0; will-change: transform; }
 .burgerhp .ghost { opacity: .12; filter: grayscale(1); }
 .hpnum { font-size: 34px; line-height: .8; font-weight: 600; min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
 .hpnum small { display: block; font-size: 14px; letter-spacing: .2em; color: rgba(255,255,255,.45); }
 .score { position: absolute; right: max(22px, env(safe-area-inset-right)); top: calc(12px + env(safe-area-inset-top)); text-align: right; }
-.score .digits { font-size: 56px; line-height: .85; font-weight: 600; letter-spacing: .06em; font-variant-numeric: tabular-nums;
+.score .digits { will-change: transform; font-size: 56px; line-height: .85; font-weight: 600; letter-spacing: .06em; font-variant-numeric: tabular-nums;
   background: linear-gradient(180deg, #ffffff 0%, #d9e6ff 45%, #6f7fa8 50%, #e8f0ff 56%, #9fb0d6 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)) drop-shadow(0 0 12px rgba(120,170,255,.35)); }
 .score .hi { font-size: 18px; letter-spacing: .25em; color: rgba(255,255,255,.5); }
@@ -68,13 +69,13 @@ const CSS = `
 .obj .ingrid.on span { color: #ffd2e6; }
 .obj .kills svg { width: 22px; height: 22px; color: #c8ccd8; }
 .obj .kbar { width: 120px; height: 6px; background: rgba(255,255,255,.1); border-radius: 2px; overflow: hidden; }
-.obj .kbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #39d0ff, #b46bff); transition: width .3s; }
+.obj .kbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #39d0ff, #b46bff); transform: scaleX(0); transform-origin: left; transition: transform .3s; will-change: transform; }
 .obj .done { color: #7dff8a; }
 .boss { position: absolute; left: 50%; top: calc(18px + env(safe-area-inset-top)); width: min(560px, 70vw); transform: translateX(-50%); text-align: center; display: none; }
 .boss.on { display: block; animation: drop .6s cubic-bezier(.2,1.4,.4,1); }
 .boss .name { font-size: 26px; letter-spacing: .35em; color: #ff3b4a; text-shadow: 0 0 14px rgba(255,40,60,.7); }
 .boss .bbar { height: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,60,80,.4); transform: skewX(-12deg); overflow: hidden; }
-.boss .bbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #7a0010, #ff2b3b, #ff8a8a); box-shadow: 0 0 14px #ff2b3b; transition: width .2s; }
+.boss .bbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #7a0010, #ff2b3b, #ff8a8a); box-shadow: 0 0 14px #ff2b3b; transform-origin: left; transition: transform .2s; will-change: transform; }
 .banner { position: absolute; left: 0; right: 0; top: 30%; text-align: center; opacity: 0; transition: opacity .35s, transform .35s; transform: scale(1.15); }
 .banner.on { opacity: 1; transform: scale(1); }
 .banner .t { font-size: clamp(42px, 7vw, 92px); line-height: .9; font-weight: 700; letter-spacing: .04em;
@@ -88,7 +89,7 @@ const CSS = `
 .toast.on { opacity: 1; }
 .pop { position: absolute; font-size: 26px; font-weight: 600; color: #fff; text-shadow: 0 0 8px rgba(255,60,160,.9), 0 2px 0 #000; transform: translate(-50%, -50%); animation: pop 1s ease-out forwards; white-space: nowrap; }
 .pop.neg { color: #ff6060; }
-.arrow { position: absolute; width: 0; height: 0; display: none; }
+.arrow { position: absolute; left: 0; top: 0; width: 0; height: 0; display: none; will-change: transform; }
 .arrow.on { display: block; }
 .arrow b { position: absolute; left: -16px; top: -16px; width: 32px; height: 32px; display: grid; place-items: center; color: #ff5fa2; filter: drop-shadow(0 0 8px #ff5fa2); animation: pulse 1s infinite; }
 .arrow b svg { width: 26px; height: 26px; }
@@ -151,6 +152,28 @@ export class HUD {
 
   show(v) { this.el.classList.toggle('hidden', !v); }
 
+  // The first paint of the HUD makes the browser compile its raster shaders (blurred shadows,
+  // drop-shadow filters, gradient text) on the GPU thread: ~150 ms that used to land on the
+  // first frames of play. Paint everything once, 1% opaque over the boot screen, while loading.
+  prime(ms = 600) {
+    const el = this.el, banner = this.$('h-banner'), toast = this.$('h-toast');
+    this.$('h-bt').textContent = 'COBRA';
+    this.$('h-bs').textContent = 'NIGHT';
+    toast.textContent = 'CHECKPOINT';
+    el.classList.remove('hidden');
+    for (const e of [el, banner, toast]) e.style.transition = 'none';
+    banner.classList.add('on');
+    toast.classList.add('on');
+    Object.assign(el.style, { opacity: '0.01', zIndex: '60' });
+    setTimeout(() => {
+      banner.classList.remove('on');
+      toast.classList.remove('on');
+      el.classList.add('hidden');
+      Object.assign(el.style, { opacity: '', zIndex: '' });
+      requestAnimationFrame(() => { for (const e of [el, banner, toast]) e.style.transition = ''; });
+    }, ms);
+  }
+
   set(key, val, fn) {
     if (this.cache[key] === val) return;
     this.cache[key] = val;
@@ -177,7 +200,7 @@ export class HUD {
     const q = s.pill > 0 ? s.pill / 10 : s.quack;
     const qk = Math.round(q * 200);
     this.set('quack', qk, () => {
-      this.$('h-qfill').style.width = `${Math.max(0, q) * 100}%`;
+      this.$('h-qfill').style.transform = `scaleX(${Math.min(1, Math.max(0, q))})`;
       const qe = this.$('h-quack');
       qe.classList.toggle('low', q > 0 && q < 0.25);
       qe.classList.toggle('empty', q <= 0);
@@ -199,7 +222,7 @@ export class HUD {
     this.set('kills', `${s.kills}/${s.quota}`, () => {
       this.$('h-kills').textContent = `${Math.min(s.kills, s.quota)}/${s.quota}`;
       this.$('h-kills').classList.toggle('done', s.kills >= s.quota);
-      this.$('h-kbar').style.width = `${Math.min(1, s.kills / s.quota) * 100}%`;
+      this.$('h-kbar').style.transform = `scaleX(${Math.min(1, s.kills / s.quota)})`;
     });
     this.set('level', s.level, (v) => { this.$('h-level').textContent = v; });
     this.set('combo', s.combo, (v) => {
@@ -258,7 +281,7 @@ export class HUD {
     if (name === null) { b.classList.remove('on'); return; }
     b.classList.add('on');
     this.$('h-bossname').textContent = name;
-    this.$('h-bossbar').style.width = `${Math.max(0, frac) * 100}%`;
+    this.$('h-bossbar').style.transform = `scaleX(${Math.min(1, Math.max(0, frac))})`;
   }
 
   // Off-screen pointer toward a world target (already projected to screen space).
@@ -271,8 +294,7 @@ export class HUD {
       a.querySelector('b').innerHTML = kind === 'exit' ? '▶' : kind === 'burger' ? ICONS.burger : ICONS.heart;
     }
     const m = 46;
-    a.style.left = `${Math.min(w - m, Math.max(m, sx))}px`;
-    a.style.top = `${Math.min(h - 140, Math.max(m + 70, sy))}px`;
+    a.style.transform = `translate(${Math.round(Math.min(w - m, Math.max(m, sx)))}px, ${Math.round(Math.min(h - 140, Math.max(m + 70, sy)))}px)`;
   }
 }
 

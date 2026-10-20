@@ -62,6 +62,34 @@ AAA 2.5D games (*Trine*, *Shadow Complex*, *Inside*). Readable silhouettes from 
 rich surface detail, bevels/edges catching light, grime, wear, and lots of small detail
 (bolts, rivets, cables, signage, labels, stickers) – the camera sees mostly front faces and tops.
 
+## Frame pacing (no runtime builds, compiles or uploads)
+
+three.js compiles a shader, uploads a mesh and uploads a texture the first time each is drawn.
+On Windows/ANGLE (D3D11 + FXC) one lit-material shader takes 100-400 ms, so anything seen for
+the first time mid-game freezes it. Rules:
+
+- Never build models, characters or materials during play. Everything a level can show is
+  built in `Game.loadLevel` and made GPU-resident by `Game.warmGpu` (parallel shader compile
+  for the composer's render-target variant, then one frame drawn with everything visible and
+  unculled). Runtime-spawned things come from pools/warm sets: `prewarmEnemies` (rig pools
+  sized from the level's encounters + ambient crowd, bike/pram), `Traffic` (fleet built in its
+  constructor), `projectileWarmSet`, `pickupWarmSet`. A new spawnable thing needs an entry there.
+- Don't toggle material state that changes the program (`transparent`, `side`, defines,
+  `needsUpdate`) at runtime unless warmGpu covers that variant (rig fade-outs are covered).
+- The light count is part of every program: don't add, remove or show/hide real lights during
+  play or cinematics (use `LightPool` sources; the title logo's sweep is shaded in its own
+  material for this reason).
+- Static props: `place()` freezes every node's matrix except the nodes `update()` moves (named /
+  `userData.dynamic` nodes or ones seen moving). Moving props need `{ static: false }`.
+- Don't read layout (`clientWidth`, `getBoundingClientRect`) per frame - use
+  `renderer.width/height`. HUD elements that change often animate `transform`/`opacity` only
+  and sit in their own compositor layer (`will-change`), so they never re-raster big areas.
+  The browser compiles its own raster shaders on the first HUD paint, so `hud.prime()` paints
+  the HUD once (1% opaque) at boot.
+- Check with `python tools/perf.py --level N [--headed] [--seed 7]`: it plays the level with
+  the chaos bot and must report `programs a -> a` (no runtime compiles), no geometry/texture
+  growth and `runtime character builds: 0`, plus frame-time percentiles and the worst frames.
+
 ## Tools
 
 - Local server: `python -m http.server 8123 --bind 127.0.0.1` from the project root

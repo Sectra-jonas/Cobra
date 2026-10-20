@@ -6,10 +6,11 @@ import { LightPool } from '../core/lightpool.js';
 import { Sky, makeSkyline, Rain, Lightning, WetGround } from '../core/environment.js';
 import { CameraRig } from './camera.js';
 import { Player } from './player.js';
-import { Enemy, Pram, prewarmRigs, ENEMY_TYPES } from './enemies.js';
+import { Enemy, Pram, prewarmEnemies, freeRigs, ENEMY_TYPES } from './enemies.js';
 import { Ingrid } from './ingrid.js';
-import { Pickup } from './pickups.js';
-import { Projectiles, WEAPONS } from './combat.js';
+import { Pickup, pickupWarmSet } from './pickups.js';
+import { Projectiles, WEAPONS, projectileWarmSet } from './combat.js';
+import { SUMMONS } from './boss.js';
 import { Poses } from '../actors/rig.js';
 import { Traffic, Helicopter } from './ambient.js';
 import { LevelBuilder, loadProps } from './level.js';
@@ -38,6 +39,28 @@ function makeEnvMap(renderer, colors) {
   const rt = pm.fromScene(s, 0.04);
   pm.dispose();
   return rt.texture;
+}
+
+// The shadow pass draws every caster with one shared depth material and only re-picks its
+// program (face side, instancing, map / alpha test copied from the caster) when some other
+// parameter changes, so which depth variants exist depends on draw order: a pram's double-sided
+// hood drawn right after an instanced mesh compiled a new one mid-game. Stand-ins for every
+// combination, compiled with the level, cover any order.
+let depthStandIns = null;
+function shadowDepthVariants() {
+  if (depthStandIns) return depthStandIns;
+  const g = new THREE.Group();
+  const geo = new THREE.PlaneGeometry(0.01, 0.01);
+  const tex = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+  tex.needsUpdate = true;
+  for (const side of [THREE.FrontSide, THREE.BackSide, THREE.DoubleSide]) {
+    for (const [map, alphaTest] of [[null, 0], [tex, 0], [tex, 0.5]]) {
+      const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side, map, alphaTest });
+      g.add(new THREE.Mesh(geo, m), new THREE.InstancedMesh(geo, m, 1));
+    }
+  }
+  depthStandIns = g;
+  return g;
 }
 
 export class Game {
@@ -74,10 +97,16 @@ export class Game {
   async loadLevel(index) {
     await this.propsPromise;
     this.dispose();
+    this.loading = true;
     this.loadId = (this.loadId || 0) + 1;
     this.levelIndex = index;
     const def = this.levels[index];
     const scene = new THREE.Scene();
+    // the root never moves: without this every render recomputes all ~3000 world matrices
+    // (static props opt out via matrixAutoUpdate, but a dirty root forces its whole tree);
+    // render() updates the graph once per frame for both the reflection and the main pass
+    scene.matrixAutoUpdate = false;
+    scene.matrixWorldAutoUpdate = false;
     this.scene = scene;
     this.world = new World();
     this.world.minX = def.minX ?? -6;
@@ -176,8 +205,11 @@ export class Game {
     this.camRig.snap(def.start.x, def.start.y);
     this.renderer.setGrade(def.grade || {});
     this.hud.update(0, this.hudState());
-    prewarmRigs(def.enemyPool.map(([t]) => ENEMY_TYPES[t].char), 1);
-    try { this.renderer.gl.compile(scene, this.camRig.cam); } catch (e) { /* ignore */ }
+    const foes = prewarmEnemies(this, def.boss ? [...SUMMONS, ...SUMMONS] : []);
+    const loadId = this.loadId;
+    await this.warmGpu([...foes.extra, ...(this.traffic?.pool || []), projectileWarmSet(), pickupWarmSet()], [...foes.rigs, this.ingrid.rig]);
+    if (loadId !== this.loadId) return def;
+    this.loading = false;
     this.state = 'play';
     this.tipT = 0;
     this.tips = index === 0 ? [
@@ -191,6 +223,65 @@ export class Game {
     sound.setAmbience(def.ambience || null);
     sound.setMusicIntensity(0.3);
     return def;
+  }
+
+  // three.js compiles shaders and uploads meshes/textures lazily, on first draw. On D3D
+  // (ANGLE + FXC) a lit-material shader takes 100-400 ms to compile, so every enemy type,
+  // prop or effect seen for the first time froze the game. Before play, every program the
+  // level can use is compiled in parallel (KHR_parallel_shader_compile) for the render-target
+  // output the pipeline really draws into (compiling for the canvas gives other, tone-mapped
+  // variants), then one frame is drawn with everything visible and unculled so all meshes,
+  // textures and shadow-depth variants are GPU-resident. `extra` are objects that only enter
+  // the scene during play; `rigs` also get their fade-out (transparent) variants compiled.
+  async warmGpu(extra, rigs) {
+    const R = this.renderer, gl = R.gl, scene = this.scene, cam = this.camRig.cam;
+    const t0 = performance.now();
+    const tmp = new THREE.Group();
+    tmp.add(shadowDepthVariants());
+    for (const o of extra) tmp.add(o);
+    for (const r of rigs) if (r && !r.root.parent) tmp.add(r.root);
+    scene.add(tmp);
+    // lights keep their effective visibility: the light count is part of every program
+    const lit = new Map();
+    scene.traverse((o) => {
+      if (!o.isLight) return;
+      let v = true;
+      for (let p = o; p; p = p.parent) if (!p.visible) { v = false; break; }
+      lit.set(o, v);
+    });
+    const saved = [];
+    scene.traverse((o) => {
+      saved.push([o, o.visible, o.frustumCulled]);
+      o.visible = lit.has(o) ? lit.get(o) : true;
+      o.frustumCulled = false;
+    });
+    const compile = () => {
+      const prev = gl.getRenderTarget();
+      gl.setRenderTarget(R.composer.renderTarget1);
+      const done = gl.compileAsync(scene, cam);
+      gl.setRenderTarget(prev);
+      return done;
+    };
+    const draw = () => {
+      scene.updateMatrixWorld();
+      if (this.wet) this.wet.update(0, scene, cam);
+      R.render(scene, cam, 0);
+    };
+    const fade = R.fade;
+    try {
+      await compile();
+      for (const r of rigs) r?.setOpacity(0.5);
+      await compile();
+      R.fade = 1;
+      draw(); // ANGLE finishes some D3D shader work on a program's first draw, not at link
+      for (const r of rigs) r?.setOpacity(1);
+      draw();
+    } finally {
+      R.fade = fade;
+      for (const [o, v, f] of saved) { o.visible = v; o.frustumCulled = f; }
+      scene.remove(tmp);
+    }
+    this.warmMs = Math.round(performance.now() - t0);
   }
 
   drawColliders() {
@@ -242,7 +333,7 @@ export class Game {
     const before = this.score;
     this.score = Math.max(0, this.score + pts);
     if (x !== undefined) {
-      const s = this.camRig.toScreen(new THREE.Vector3(x, y, 0), this.renderer.container.clientWidth, this.renderer.container.clientHeight);
+      const s = this.camRig.toScreen(new THREE.Vector3(x, y, 0), this.renderer.width, this.renderer.height);
       this.hud.popup(s.x, s.y, (pts > 0 ? '+' : '') + pts, pts < 0);
     }
     while (this.score >= this.nextLife) {
@@ -338,6 +429,12 @@ export class Game {
     let r = Math.random() * total, type = pool[0][0];
     for (const [t, w] of pool) { r -= w; if (r <= 0) { type = t; break; } }
     if (this.lock && type === 'biker') type = 'thug';
+    // never generate a character mid-game: fall back to a type with a pooled rig
+    if (!freeRigs(type)) {
+      const alt = pool.filter(([t]) => freeRigs(t) && !(this.lock && t === 'biker'));
+      if (!alt.length) return null;
+      type = alt[Math.floor(Math.random() * alt.length)][0];
+    }
     // door spawn when a doorway is on screen
     const doors = this.builder.doors.filter((d) => Math.abs(d.x - cam.focus.x) < half - 2 && Math.abs(d.x - P.x) > 4);
     if (doors.length && Math.random() < 0.35 && type !== 'biker') {
@@ -366,7 +463,7 @@ export class Game {
 
   // ------------------------------------------------------------ update
   update(rawDt) {
-    if (this.state === 'idle' || !this.scene) return;
+    if (this.state === 'idle' || !this.scene || this.loading) return;
     if (input.pressed('pause') && (this.state === 'play' || this.state === 'paused')) this.togglePause();
     if (this.state === 'paused') { this.renderOnly = true; return; }
     this.renderOnly = false;
@@ -581,11 +678,11 @@ export class Game {
         this.particles.splash(x, z > 0.8 ? 0 : (isFinite(gy) ? gy : 0), z, 2);
       }
     }
-    this.particles.setScale(this.renderer.container.clientHeight * this.renderer.pixelRatio / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2))));
+    this.particles.setScale(this.renderer.height * this.renderer.pixelRatio / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2))));
   }
 
   updatePointers() {
-    const w = this.renderer.container.clientWidth, h = this.renderer.container.clientHeight;
+    const w = this.renderer.width, h = this.renderer.height;
     const half = this.camRig.visibleHalfWidth();
     const fx = this.camRig.focus.x;
     let target = null, kind = null;
@@ -832,8 +929,9 @@ export class Game {
 
   // ------------------------------------------------------------ render
   render(rawDt) {
-    if (!this.scene) return;
+    if (!this.scene || this.loading) return;
     const cam = this.camRig.cam;
+    this.scene.updateMatrixWorld();
     if (this.wet && !this.renderOnly) this.wet.update(this.dt || rawDt, this.scene, cam);
     this.renderer.render(this.scene, cam, rawDt);
   }

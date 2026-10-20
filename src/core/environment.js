@@ -413,6 +413,15 @@ export class WetGround {
 
   update(dt, scene, camera) {
     this.uniforms.uTime.value += dt;
+    // Re-rendered every other frame (it costs as much CPU as the main pass). The puddles sample
+    // it through the matrix of the camera it was rendered from, so static scenery stays
+    // world-locked in between and only moving things lag a frame - invisible in a blurred,
+    // rippled reflection. Camera cuts and jumps re-render immediately.
+    const cut = !this.camPos || this.camPos.distanceToSquared(camera.position) > 0.25 || this.camFov !== camera.fov;
+    if (!cut && !this.stale) { this.stale = true; return; }
+    this.stale = false;
+    (this.camPos ||= new THREE.Vector3()).copy(camera.position);
+    this.camFov = camera.fov;
     const renderer = this.renderer;
     const n = new THREE.Vector3(0, 1, 0);
     const planePos = new THREE.Vector3(camera.position.x, this.planeY, 0);

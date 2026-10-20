@@ -20,6 +20,30 @@ export async function loadProps() {
   return all;
 }
 
+// Nodes of a prop that its update() moves: named / userData.dynamic nodes (the convention for
+// animated parts) plus any whose transform changes over a few sampled updates. null when the
+// update cannot run standalone, in which case the whole prop stays dynamic.
+function animatedNodes(root, update) {
+  const nodes = [];
+  root.traverse((n) => nodes.push(n));
+  const before = nodes.map((n) => [n.position.clone(), n.quaternion.clone(), n.scale.clone()]);
+  try {
+    for (const t of [0.13, 0.71, 1.9, 3.7, 6.3, 11.1]) update(1 / 60, t);
+  } catch (e) {
+    return null;
+  }
+  const moving = new Set();
+  nodes.forEach((n, i) => {
+    const [p, q, s] = before[i];
+    const moved = !n.position.equals(p) || !n.quaternion.equals(q) || !n.scale.equals(s);
+    if (moved || (n !== root && (n.name || n.userData.dynamic))) moving.add(n);
+    n.position.copy(p);
+    n.quaternion.copy(q);
+    n.scale.copy(s);
+  });
+  return moving;
+}
+
 let ladderMats = null;
 export function makeLadderMesh(height, width = 0.55) {
   ladderMats ||= { rail: new THREE.MeshStandardMaterial({ color: '#2b2e33', roughness: 0.45, metalness: 0.85 }) };
@@ -138,7 +162,11 @@ export class LevelBuilder {
     });
     if (o.static !== false) {
       obj.updateMatrixWorld(true);
-      if (!ud.update) obj.traverse((m) => { m.matrixAutoUpdate = false; });
+      // Freeze every transform the prop never animates. update() mostly drives materials and
+      // lights (neon flicker, beacons); only the nodes it actually moves keep recomputing their
+      // matrices each frame (in the city that was ~1500 meshes of otherwise static buildings).
+      const moving = ud.update ? animatedNodes(obj, ud.update) : new Set();
+      if (moving) obj.traverse((m) => { m.matrixAutoUpdate = moving.has(m); });
     }
     return obj;
   }
@@ -152,6 +180,8 @@ export class LevelBuilder {
       const m = makeLadderMesh(y1 - y0);
       m.position.set(x, y0, o.z ?? -0.35);
       this.scene.add(m);
+      m.updateMatrixWorld(true);
+      m.traverse((c) => { c.matrixAutoUpdate = false; });
     }
   }
 
@@ -162,6 +192,8 @@ export class LevelBuilder {
     m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
     m.castShadow = o.shadow !== false;
     m.receiveShadow = true;
+    m.updateMatrix();
+    m.matrixAutoUpdate = false;
     this.scene.add(m);
     if (o.solid) this.world.addSolid(x0, x1, y0, y1);
     if (o.ledge) this.world.addLedge(x0, x1, y1);

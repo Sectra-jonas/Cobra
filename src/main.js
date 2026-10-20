@@ -14,6 +14,9 @@ const ui = document.getElementById('ui');
 const boot = document.getElementById('boot');
 const bootbar = document.getElementById('bootbar');
 const setBoot = (f) => { if (bootbar) bootbar.style.width = `${Math.round(f * 100)}%`; };
+// fade the boot screen out, then take it out of rendering: its pulsing prompt would otherwise
+// keep repainting (invisibly) for the whole session
+const hideBoot = () => { boot.classList.add('done'); setTimeout(() => { boot.hidden = true; }, 900); };
 
 const renderer = new Renderer(app);
 const hud = new HUD(ui);
@@ -44,6 +47,11 @@ async function toTitle(fromIntro = false) {
     hud.show(false);
     await game.loadLevel(0);
     director.attach();
+    // the title's logo lights need their own shader variants: build them now, drawn black
+    const fade = renderer.fade;
+    renderer.fade = 1;
+    director.warmup();
+    renderer.fade = fade;
     director.toTitle(true);
   }
   mode = 'title';
@@ -133,7 +141,7 @@ async function start() {
   await game.loadLevel(direct ? (q.get('level') === 'test' ? 0 : Math.min(parseInt(q.get('level'), 10) || 0, levels.length - 1)) : 0);
   setBoot(1);
   if (direct) {
-    boot.classList.add('done');
+    hideBoot();
     startPlay();
     window.__ready = true;
     return;
@@ -144,6 +152,7 @@ async function start() {
   renderer.fade = 1;
   // a gesture is required before audio can play: hold on a press-start screen
   const touch = document.body.classList.contains('has-touch');
+  hud.prime();
   boot.classList.add('ready');
   boot.querySelector('.t').innerHTML = `<div class="ok">READY</div><div class="go">${touch ? 'TAP TO START' : 'PRESS ANY KEY'}</div>`
     + `<div class="sub">${touch ? '' : 'OR CLICK ANYWHERE · '}HEADPHONES RECOMMENDED</div>`;
@@ -155,7 +164,7 @@ async function start() {
 function beginIntro() {
   if (mode !== 'press') return;
   sound.unlock();
-  boot.classList.add('done');
+  hideBoot();
   if (q.has('skipintro')) { director.toTitle(true); return; }
   mode = 'intro';
   director.startIntro();

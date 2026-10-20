@@ -7,6 +7,8 @@ import { moveBody } from './physics.js';
 import { sound } from '../core/sound.js';
 
 const MAX_HP = 1400;
+// cultists answering his blade clang, in spawn order (the level pre-builds their rigs)
+export const SUMMONS = ['axeman', 'axeman', 'gunner'];
 
 export class Boss {
   constructor(game, x, y, arena) {
@@ -220,7 +222,7 @@ export class Boss {
           for (let i = 0; i < n; i++) {
             const side = i % 2 ? 1 : -1;
             const ex = THREE.MathUtils.clamp(b.x + side * (9 + i), this.arena.x0 + 1, this.arena.x1 - 1);
-            setTimeout(() => g.spawnEnemy(i === 2 ? 'gunner' : 'axeman', ex, 0.05, { facing: -side }), i * 600);
+            setTimeout(() => g.spawnEnemy(SUMMONS[i], ex, 0.05, { facing: -side }), i * 600);
           }
         }
         if (this.stateT > 2.2) { this.aura = this.phase === 3 ? 1 : 0; this.recover(0.6); }
