@@ -95,6 +95,9 @@ const CSS = `
 .arrow b svg { width: 26px; height: 26px; }
 .arrow.exit b { color: #7dff8a; filter: drop-shadow(0 0 8px #7dff8a); }
 .arrow.burger b { color: #ffb347; filter: drop-shadow(0 0 8px #ffb347); }
+.arrow i { position: absolute; left: 0; top: 0; margin: -6px 0 0 -5px; border: 6px solid transparent; border-right: 0; border-left: 10px solid #ff5fa2; filter: drop-shadow(0 0 6px #ff5fa2); will-change: transform; }
+.arrow.burger i { border-left-color: #ffb347; filter: drop-shadow(0 0 6px #ffb347); }
+.arrow.exit i { display: none; }
 @keyframes pop { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.6); } 15% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -160%) scale(1); } }
 @keyframes blink { 50% { opacity: .35; } }
 @keyframes drop { from { transform: translate(-50%, -40px); opacity: 0; } }
@@ -128,7 +131,8 @@ export class HUD {
       <div class="banner" id="h-banner"><div class="t" id="h-bt"></div><div class="s" id="h-bs"></div></div>
       <div class="toast" id="h-toast"></div>
       <div class="loc" id="h-loc"></div>
-      <div class="arrow" id="h-arrow"><b>${ICONS.heart}</b></div>
+      <div class="arrow" id="h-arrow"><b>${ICONS.heart}</b><i></i></div>
+      <div class="arrow burger" id="h-barrow"><b>${ICONS.burger}</b><i></i></div>
       <div class="hud-bottom">
         <div class="panel"><div class="in"><div class="lives" id="h-lives"></div><div class="nade" id="h-nade">${ICONS.grenade}<span>3</span></div></div></div>
         <div class="panel"><div class="in">
@@ -146,6 +150,7 @@ export class HUD {
     this.cache = {};
     this.bannerT = 0;
     this.toastT = 0;
+    this.arrowKinds = {};
     this.comboT = 0;
     this.lastLives = -1;
   }
@@ -156,7 +161,7 @@ export class HUD {
   // drop-shadow filters, gradient text) on the GPU thread: ~150 ms that used to land on the
   // first frames of play. Paint everything once, 1% opaque over the boot screen, while loading.
   prime(ms = 600) {
-    const el = this.el, banner = this.$('h-banner'), toast = this.$('h-toast');
+    const el = this.el, banner = this.$('h-banner'), toast = this.$('h-toast'), arrows = [this.$('h-arrow'), this.$('h-barrow')];
     this.$('h-bt').textContent = 'COBRA';
     this.$('h-bs').textContent = 'NIGHT';
     toast.textContent = 'CHECKPOINT';
@@ -164,10 +169,12 @@ export class HUD {
     for (const e of [el, banner, toast]) e.style.transition = 'none';
     banner.classList.add('on');
     toast.classList.add('on');
+    for (const a of arrows) a.classList.add('on');
     Object.assign(el.style, { opacity: '0.01', zIndex: '60' });
     setTimeout(() => {
       banner.classList.remove('on');
       toast.classList.remove('on');
+      for (const a of arrows) a.classList.remove('on');
       el.classList.add('hidden');
       Object.assign(el.style, { opacity: '', zIndex: '' });
       requestAnimationFrame(() => { for (const e of [el, banner, toast]) e.style.transition = ''; });
@@ -284,17 +291,21 @@ export class HUD {
     this.$('h-bossbar').style.transform = `scaleX(${Math.min(1, Math.max(0, frac))})`;
   }
 
-  // Off-screen pointer toward a world target (already projected to screen space).
-  arrow(kind, sx, sy, w, h) {
-    const a = this.$('h-arrow');
-    if (!kind) { if (this.arrowKind) { a.classList.remove('on'); this.arrowKind = null; } return; }
-    if (this.arrowKind !== kind) {
-      this.arrowKind = kind;
+  // Off-screen pointer toward a world target (already projected to screen space), pinned inside
+  // the screen edge with a chevron aimed at the target. Two pointers: 'h-arrow' (Ingrid/exit)
+  // and 'h-barrow' (missing burger).
+  arrow(kind, sx, sy, w, h, id = 'h-arrow') {
+    const a = this.$(id);
+    if (!kind) { if (this.arrowKinds[id]) { a.classList.remove('on'); this.arrowKinds[id] = null; } return; }
+    if (this.arrowKinds[id] !== kind) {
+      this.arrowKinds[id] = kind;
       a.className = `arrow on ${kind}`;
       a.querySelector('b').innerHTML = kind === 'exit' ? '▶' : kind === 'burger' ? ICONS.burger : ICONS.heart;
     }
     const m = 46;
-    a.style.transform = `translate(${Math.round(Math.min(w - m, Math.max(m, sx)))}px, ${Math.round(Math.min(h - 140, Math.max(m + 70, sy)))}px)`;
+    const x = Math.round(Math.min(w - m, Math.max(m, sx))), y = Math.round(Math.min(h - 140, Math.max(m + 70, sy)));
+    a.style.transform = `translate(${x}px, ${y}px)`;
+    a.lastChild.style.transform = `rotate(${Math.atan2(sy - y, sx - x).toFixed(2)}rad) translateX(27px)`;
   }
 }
 

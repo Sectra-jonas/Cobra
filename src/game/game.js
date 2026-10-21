@@ -216,6 +216,7 @@ export class Game {
       { at: 3.5, text: '← → RUN · SPACE JUMP · ↑ CLIMB LADDERS' },
       { at: 7.5, text: 'J / Z / CTRL — "MURDER" (HEADBUTT)' },
       { at: 12, text: 'BURGERS HIDE WEAPONS — FIND ALL FOUR', dur: 3.6 },
+      { at: 16, text: 'SOME ARE UP HIGH — CLIMB THE FIRE ESCAPES ↑', dur: 3.6 },
       { at: 30, text: '↓ DUCK · ↓ + SPACE DROPS THROUGH PLATFORMS' },
       { at: 45, text: 'K — GRENADE', dur: 2.4 },
     ] : null;
@@ -693,6 +694,23 @@ export class Game {
       const s = this.camRig.toScreen(new THREE.Vector3(target.x, target.y + 1.2, 0), w, h);
       this.hud.arrow(kind, s.x, s.y, w, h);
     } else this.hud.arrow(null);
+    // second pointer: the nearest of the four burgers still missing, while it is out of frame
+    // (two city burgers sit on rooftops, above the camera's view from the street)
+    const b = this.state === 'play' ? this.missingBurger() : null;
+    const s = b && this.camRig.toScreen(new THREE.Vector3(b.x, b.y + 0.5, 0), w, h);
+    if (s && (s.x < 20 || s.x > w - 20 || s.y < 20 || s.y > h - 20)) this.hud.arrow('burger', s.x, s.y, w, h, 'h-barrow');
+    else this.hud.arrow(null, 0, 0, w, h, 'h-barrow');
+  }
+
+  missingBurger() {
+    const pb = this.player.body;
+    let best = null, bd = Infinity;
+    for (const p of this.pickups) {
+      if (p.kind !== 'burger' || p.taken || this.burgers.has(p.weapon)) continue;
+      const d = Math.hypot(p.x - pb.x, p.y - pb.y);
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
   }
 
   hudState() {

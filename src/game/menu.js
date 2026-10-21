@@ -149,7 +149,7 @@ export class Menus {
         <b>F2 / C</b><span>Toggle C64 mode</span>
         <b>PAD</b><span>Stick/D-pad move · A jump · X / RT murder · B grenade · START pause</span>
       </div>
-      <p>Weapons hide inside beef burgers. Each one wears out — watch the rubber duck. Find all four burgers, rescue Ingrid and clear the gang to move on.</p>
+      <p>Weapons hide inside beef burgers — some up high, so climb the ladders and fire escapes, or follow the burger pointer. Each one wears out — watch the rubber duck. Find all four burgers, rescue Ingrid and clear the gang to move on.</p>
       <div class="hint">ENTER / ESC — BACK</div></div>`, true);
   }
 
