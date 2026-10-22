@@ -594,7 +594,7 @@ export function makeBarn(opts = {}) {
 
   // --- lean-to machine shed on the right (open front, mono-pitch roof draining to the back)
   const colliders = [{ type: 'ledge', x0: ldX0, x1: ldX1, y: loftY }];
-  const ladders = [{ x: ladX, y0: 0, y1: loftY }];
+  const ladders = [{ x: ladX, y0: 0, y1: loftY, z: zf + 0.25, w: 0.5 }];
   if (leanTo) {
     const LW = 4.6, hf = 3.2, hb = 2.5, x0 = W / 2, x1 = W / 2 + LW, zr = zf + 0.25;
     const a = Math.atan2(hf - hb, D + 0.5);
@@ -624,7 +624,7 @@ export function makeBarn(opts = {}) {
     const llx = x1 - 0.55;
     woodLadder(b, wood, llx, 0, hf, zr + 0.18, 0.5, 0.9);
     colliders.push({ type: 'ledge', x0: x0, x1: x1 + 0.25, y: hf });
-    ladders.push({ x: llx, y0: 0, y1: hf });
+    ladders.push({ x: llx, y0: 0, y1: hf, z: zr + 0.18, w: 0.5 });
     grime(b, x0 + LW / 2, 0, LW, 1.0, -zf + 0.18);
     blob(g, LW + 1, D + 1, x0 + LW / 2, 0, 0.35);
   }
@@ -817,7 +817,7 @@ export function makeShed(opts = {}) {
     { type: 'ledge', x0: -W / 2 - ov, x1: W / 2 + ov, y: H },
     { type: 'ledge', x0: fx0, x1: fx1, y: logTop },
   ];
-  g.userData.ladders = [{ x: lx, y0: 0, y1: H }];
+  g.userData.ladders = [{ x: lx, y0: 0, y1: H, z: zr + 0.12, w: 0.48 }];
   g.userData.update = (dt, t) => { uTime.value = t; };
   return g;
 }
@@ -1143,7 +1143,7 @@ export function makeWindmill(opts = {}) {
 
   let ang = R() * TAU;
   g.userData.colliders = [{ type: 'ledge', x0: -pw, x1: pw, y: py }];
-  g.userData.ladders = [{ x: 0, y0: 0, y1: py }];
+  g.userData.ladders = [{ x: 0, y0: 0, y1: py, z: 0.22, w: 0.4 }];
   g.userData.update = (dt, t) => {
     uTime.value = t;
     const w = 2.2 + Math.sin(t * 0.23) * 0.9 + Math.sin(t * 0.71) * 0.4;
@@ -1272,7 +1272,7 @@ export function makeWaterTowerRural(opts = {}) {
   const light = { pos: V(0, tTop + 2.0, 0.6), color: '#ff2a1a', intensity: 6, distance: 8 };
   g.userData.lights = [light];
   g.userData.colliders = [{ type: 'ledge', x0: -r1, x1: r1, y: by + 0.02 }];
-  g.userData.ladders = [{ x: lx, y0: 0, y1: by + 0.02 }];
+  g.userData.ladders = [{ x: lx, y0: 0, y1: by + 0.02, z: 0, w: 0.42 }];
   g.userData.balconyY = by + 0.02;
   g.userData.update = (dt, t) => {
     uTime.value = t;
@@ -1347,7 +1347,7 @@ export function makeSilo(opts = {}) {
   blob(g, Rs * 3, Rs * 3, 0, 0, 0.5);
   grassTufts(g, 24, seed + 4, (R2, o) => { const a = R2() * PI + PI * 0.05, r = Rs + 0.2 + R2() * 1.2; o.position.set(Math.cos(a) * r, 0, Math.sin(a) * r * 0.9); });
   g.userData.colliders = [{ type: 'ledge', x0: lx0, x1: lx1, y: H }];
-  g.userData.ladders = [{ x: lx, y0: 0, y1: H }];
+  g.userData.ladders = [{ x: lx, y0: 0, y1: H, z: lz, w: 0.42 }];
   g.userData.update = (dt, t) => { uTime.value = t; };
   return g;
 }
@@ -2759,7 +2759,7 @@ export function makeMotel(opts = {}) {
     { type: 'ledge', x0: -W / 2, x1: lx1, y: deckTop },
     { type: 'ledge', x0: -W / 2 - 0.2, x1: W / 2 + 0.2, y: roofTop },
   ];
-  g.userData.ladders = [{ x: W / 2 + 0.6, y0: 0, y1: deckTop }];
+  g.userData.ladders = [{ x: W / 2 + 0.6, y0: 0, y1: deckTop, stairs: true }];
   const base = letters.map((l) => l.material.color.clone());
   g.userData.update = (dt, t) => {
     uTime.value = t;

@@ -395,7 +395,8 @@ function blinkLamps(t) {
   if (cacheM.has('lampAmber')) cacheM.get('lampAmber').emissiveIntensity = Math.sin(t * 3.1 + 1) > -0.3 ? 5 : 0.4;
 }
 
-// Caged steel ladder in local coords: rails at x±w/2, wall standoff toward -z. Returns ladder entry.
+// Caged steel ladder in local coords: rails at x±w/2, wall standoff toward -z. Returns ladder entry
+// (with its rail depth and spacing, for the readability accents).
 function steelLadder(b, x, z, y0, y1, { cage = true, ext = 1.05, w = 0.48, m = mat('steelPainted') } = {}) {
   const top = y1 + ext;
   for (const sx of [-1, 1]) {
@@ -417,7 +418,7 @@ function steelLadder(b, x, z, y0, y1, { cage = true, ext = 1.05, w = 0.48, m = m
       b.add(m, cylY(0.012, top - cy0, x + Math.cos(a) * hr, (cy0 + top) / 2, z + 0.02 + Math.sin(a) * hr, 5), 1);
     }
   }
-  return { x, y0, y1 };
+  return { x, y0, y1, z, w };
 }
 
 // ======================================================================= props

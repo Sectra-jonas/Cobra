@@ -84,6 +84,7 @@ export default {
   hemi: { sky: '#9cc2ff', ground: '#8a6a40', intensity: 1.35 },
   sun: { color: '#ffd29a', intensity: 3.3, dir: [-0.42, 0.42, -0.8] },
   fill: { color: '#7fa6ff', intensity: 0.45, dir: [0.5, 0.4, 0.8] },
+  accents: { color: '#ffd9a8', ledges: 0.6 },
   rim: { color: '#ffb46a', strength: 0.42 },
   envIntensity: 0.9,
   env: { bg: '#9fb8d8', room: '#6a5a48', panels: [{ color: '#ffd090', w: 20, h: 4, pos: [-6, 3, -8], i: 2.4 }, { color: '#8ab4ff', w: 30, h: 10, pos: [0, 10, 4], i: 1.2 }] },

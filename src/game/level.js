@@ -82,6 +82,10 @@ export class LevelBuilder {
     this.exitX = def.length - 10;
     this.hazardMeshes = [];
     this.lightLinks = [];
+    // for the readability accents (accents.js): the object each ledge/solid came from, and
+    // where each ladder's rails are drawn ({ z, w } or null when its visuals are not rails)
+    this.walkSrc = new Map();
+    this.ladderVis = new Map();
   }
 
   syncLights() {
@@ -119,10 +123,13 @@ export class LevelBuilder {
     if (o.colliders !== false) {
       for (const c of ud.colliders || []) {
         const ax = x + c.x0 * fx * s, bx = x + c.x1 * fx * s;
-        if (c.type === 'ledge') this.world.addLedge(Math.min(ax, bx), Math.max(ax, bx), y + c.y * s, { tag: o.tag });
-        else if (c.type === 'solid') this.world.addSolid(Math.min(ax, bx), Math.max(ax, bx), y + c.y0 * s, y + c.y1 * s, { tag: o.tag });
+        if (c.type === 'ledge') this.walkSrc.set(this.world.addLedge(Math.min(ax, bx), Math.max(ax, bx), y + c.y * s, { tag: o.tag }), obj);
+        else if (c.type === 'solid') this.walkSrc.set(this.world.addSolid(Math.min(ax, bx), Math.max(ax, bx), y + c.y0 * s, y + c.y1 * s, { tag: o.tag }), obj);
       }
-      for (const l of ud.ladders || []) this.world.addLadder(x + l.x * fx * s, y + l.y0 * s, y + l.y1 * s);
+      for (const l of ud.ladders || []) {
+        const lad = this.world.addLadder(x + l.x * fx * s, y + l.y0 * s, y + l.y1 * s);
+        this.ladderVis.set(lad, l.z === undefined || l.stairs ? null : { z: z + l.z * s, w: (l.w ?? 0.44) * s });
+      }
       if (ud.hazard) {
         const h = ud.hazard;
         this.world.addHazard(x + Math.min(h.x0 * fx, h.x1 * fx) * s, x + Math.max(h.x0 * fx, h.x1 * fx) * s, y + (h.y0 ?? -1) * s, y + (h.y1 ?? h.y ?? 0.3) * s, 'molten');
@@ -175,10 +182,11 @@ export class LevelBuilder {
   solid(x0, x1, y0, y1, o = {}) { return this.world.addSolid(x0, x1, y0, y1, o); }
 
   ladder(x, y0, y1, o = {}) {
-    this.world.addLadder(x, y0, y1);
+    const lad = this.world.addLadder(x, y0, y1);
     if (o.visual !== false) {
       const m = makeLadderMesh(y1 - y0);
       m.position.set(x, y0, o.z ?? -0.35);
+      this.ladderVis.set(lad, { z: o.z ?? -0.35, w: 0.55 });
       this.scene.add(m);
       m.updateMatrixWorld(true);
       m.traverse((c) => { c.matrixAutoUpdate = false; });
@@ -195,8 +203,8 @@ export class LevelBuilder {
     m.updateMatrix();
     m.matrixAutoUpdate = false;
     this.scene.add(m);
-    if (o.solid) this.world.addSolid(x0, x1, y0, y1);
-    if (o.ledge) this.world.addLedge(x0, x1, y1);
+    if (o.solid) this.walkSrc.set(this.world.addSolid(x0, x1, y0, y1), m);
+    if (o.ledge) this.walkSrc.set(this.world.addLedge(x0, x1, y1), m);
     return m;
   }
 

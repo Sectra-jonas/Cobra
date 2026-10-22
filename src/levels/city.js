@@ -192,10 +192,11 @@ export default {
   wet: { strength: 0.95, coverage: 0.55 },
   fog: { color: '#0a0c17', density: 0.0105 },
   sky: { top: '#020309', horizon: '#2b1532', bottom: '#06060b', glow: '#ff5a2a', glowAmt: 0.6, moon: true, sunDir: [0.35, 0.5, -1], sunColor: '#d6deff', sunSize: 0.99935, stars: 0.5, clouds: 0.8, cloudColor: '#161220', cloudLit: '#ff6a32' },
-  hemi: { sky: '#46588c', ground: '#24141c', intensity: 1.15 },
-  sun: { color: '#8fa6ff', intensity: 1.25, dir: [0.35, 0.85, 0.5] },
+  hemi: { sky: '#46588c', ground: '#24141c', intensity: 2.2 },
+  sun: { color: '#8fa6ff', intensity: 3.6, dir: [0.25, 0.92, 0.3] },
   fill: { color: '#ff3a8a', intensity: 0.25, dir: [-0.6, 0.3, 0.5] },
   rim: { color: '#6cc4ff', strength: 0.5 },
+  accents: { color: '#8fa8dd' },
   envIntensity: 0.8,
   env: { panels: [
     { color: '#ff2f8e', w: 6, h: 3, pos: [-8, 2, -6], i: 4 }, { color: '#2fd2ff', w: 6, h: 3, pos: [8, 3, -6], i: 4 },

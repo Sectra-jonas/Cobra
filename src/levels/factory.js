@@ -14,7 +14,8 @@ function ladder(L, x, y0, y1, z = -0.4) {
     const m = L.prop('makeLadderSteel', { height: y1 - y0 });
     m.position.set(x, y0, z);
     L.scene.add(m);
-    L.world.addLadder(x, y0, y1);
+    const rails = m.userData.ladders?.[0];
+    L.ladderVis.set(L.world.addLadder(x, y0, y1), { z: z + (rails?.z ?? 0), w: rails?.w ?? 0.48 });
   } else L.ladder(x, y0, y1, { z });
 }
 
@@ -44,9 +45,10 @@ export default {
   wet: { strength: 0.3, coverage: 0.22 },
   fog: { color: '#120907', density: 0.017 },
   sky: { top: '#030202', horizon: '#241008', bottom: '#050302', glow: '#ff5a1a', glowAmt: 0.5, moon: false, sunDir: [0, -1, 0], sunColor: '#000000', sunSize: 0.9999, stars: 0, clouds: 0 },
-  hemi: { sky: '#4a3430', ground: '#1e0f08', intensity: 0.85 },
-  sun: { color: '#7f9cff', intensity: 1.0, dir: [-0.25, 0.9, -0.5] },
+  hemi: { sky: '#4a3430', ground: '#1e0f08', intensity: 1.9 },
+  sun: { color: '#7f9cff', intensity: 2.6, dir: [-0.2, 0.95, -0.25] },
   fill: { color: '#ff6a20', intensity: 0.35, dir: [0.4, 0.2, 0.8] },
+  accents: { color: '#e0a868' },
   rim: { color: '#ff7a30', strength: 0.36 },
   envIntensity: 0.7,
   env: { bg: '#0a0504', room: '#120806', panels: [

@@ -128,7 +128,7 @@ function compose(group, kit, child, x = 0, y = 0, z = 0, o = {}) {
         ? { ...c, x0: c.x0 + x, x1: c.x1 + x, y: c.y + y }
         : { ...c, x0: c.x0 + x, x1: c.x1 + x, y0: c.y0 + y, y1: c.y1 + y });
     }
-    for (const l of ud.ladders || []) (gd.ladders ||= []).push({ ...l, x: l.x + x, y0: l.y0 + y, y1: l.y1 + y });
+    for (const l of ud.ladders || []) (gd.ladders ||= []).push({ ...l, x: l.x + x, y0: l.y0 + y, y1: l.y1 + y, z: l.z === undefined ? undefined : l.z + z });
   }
   if (o.lights !== false) for (const L of ud.lights || []) (gd.lights ||= []).push({ ...L, pos: L.pos.clone().applyMatrix4(child.matrixWorld) });
   for (const e of ud.emitters || []) (gd.emitters ||= []).push({ ...e, pos: e.pos.clone().applyMatrix4(child.matrixWorld) });
@@ -860,7 +860,7 @@ export function makeFireEscape(opts = {}) {
       }
       IB(0.5, 0.12, 0.12, x, yb + 0.05, zL); // weighted bottom rung
     }
-    ladders.push({ x, y0, y1 });
+    ladders.push({ x, y0, y1, z: zL, w: 0.44 });
   }
   finalize(g, k);
   g.userData.colliders = colliders;
@@ -1922,7 +1922,7 @@ export function makeWaterTower(opts = {}) {
   k.add(streakMat('dark'), xf(new THREE.CylinderGeometry(R0 + 0.003, R0 + 0.003, tankH * 0.7, 20, 1, true, -1.1, 2.2), 0, ty0 + tankH * 0.62, zc), 0, false);
   finalize(g, k);
   g.userData.colliders = [{ type: 'ledge', x0: -DW, x1: DW, y: legH }];
-  g.userData.ladders = [{ x: lad, y0: 0, y1: legH }];
+  g.userData.ladders = [{ x: lad, y0: 0, y1: legH, z: -0.3, w: 0.44 }];
   g.userData.emitters = [{ type: 'drip', pos: v3(-R0 * 0.82, 0.1, zc + R0 * 0.85), rate: 1.5 }];
   return g;
 }
@@ -2143,7 +2143,7 @@ export function makeBillboard(opts = {}) {
   }
   finalize(g, k);
   g.userData.colliders = [{ type: 'ledge', x0: -W / 2, x1: W / 2, y: cy }];
-  g.userData.ladders = [{ x: lad, y0: 0, y1: cy }];
+  g.userData.ladders = [{ x: lad, y0: 0, y1: cy, z: -0.3, w: 0.44 }];
   g.userData.lights = lights;
   return g;
 }
@@ -3060,7 +3060,7 @@ export function makeScaffold(opts = {}) {
   for (let i = 0; i < levels; i++) {
     const x = ladX(i);
     ladderParts(k, solid('#c8ccd0', 0.4, 0.8), x, -0.3, i * lh, (i + 1) * lh, 1.0, 0.42);
-    ladders.push({ x, y0: i * lh, y1: (i + 1) * lh });
+    ladders.push({ x, y0: i * lh, y1: (i + 1) * lh, z: -0.3, w: 0.42 });
   }
   const banner = paintMat('constructionBanner', 512, 128, (c, w, h) => {
     c.fillStyle = '#e8b81a'; c.fillRect(0, 0, w, h);

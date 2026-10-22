@@ -137,7 +137,10 @@ const FinalShader = {
       col = col * uGain + uLift * (1.0 - col);
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(vec3(l), col, uSat);
-      col = (col - 0.5) * uContrast + 0.5;
+      // contrast as an S-curve around mid-grey (slope uContrast there) that keeps the toe: a
+      // linear stretch clipped everything under ~4% to black, and with it every unlit ledge
+      vec3 c2 = clamp(2.0 * col, 0.0, 2.0);
+      col = mix(0.5 * pow(c2, vec3(uContrast)), 1.0 - 0.5 * pow(2.0 - c2, vec3(uContrast)), step(1.0, c2));
 
       // damage pulse: desaturate + red edge
       if (uDamage > 0.0) {

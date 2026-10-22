@@ -62,8 +62,10 @@ const factories = {
   stuccoPink: () => fromSet(TX.stucco({ color: '#a8746f', seed: 63 }), { roughness: 1 }),
   stuccoTeal: () => fromSet(TX.stucco({ color: '#4f7c7a', seed: 65 }), { roughness: 1 }),
   stuccoWhite: () => fromSet(TX.stucco({ color: '#c9c3b6', seed: 67, stain: 0.6 }), { roughness: 1 }),
-  ironBlack: () => fromSet(TX.metalPlate({ color: '#232527', seed: 17, rust: 0.35, diamond: false }), { roughness: 1, metalness: 1 }),
-  steelPainted: () => fromSet(TX.metalPlate({ color: '#3d4650', seed: 18, rust: 0.2, diamond: false }), { roughness: 1, metalness: 1 }),
+  // painted iron/steel is a dielectric (paint) with worn spots, not bare metal: with metalness 1 a
+  // dark plate has no diffuse response and fire escapes, ladders and rails stayed black at night
+  ironBlack: () => fromSet(TX.metalPlate({ color: '#232527', seed: 17, rust: 0.35, diamond: false }), { roughness: 1, metalness: 0.35 }),
+  steelPainted: () => fromSet(TX.metalPlate({ color: '#3d4650', seed: 18, rust: 0.2, diamond: false }), { roughness: 1, metalness: 0.35 }),
   diamondPlate: () => fromSet(TX.metalPlate({ color: '#6a6e73', seed: 19, rust: 0.15, diamond: true }), { roughness: 1, metalness: 1 }),
   rustMetal: () => fromSet(TX.metalPlate({ color: '#5a4a3e', seed: 21, rust: 0.85, diamond: false }), { roughness: 1, metalness: 1 }),
   corrugated: () => fromSet(TX.corrugated({ color: '#8d9399', seed: 51, rust: 0.45 }), { roughness: 1, metalness: 1 }),

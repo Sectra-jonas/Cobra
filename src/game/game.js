@@ -14,6 +14,7 @@ import { SUMMONS } from './boss.js';
 import { Poses } from '../actors/rig.js';
 import { Traffic, Helicopter } from './ambient.js';
 import { LevelBuilder, loadProps } from './level.js';
+import { buildAccents } from './accents.js';
 import { rimUniforms } from '../actors/rig.js';
 import { input } from '../core/input.js';
 import { sound } from '../core/sound.js';
@@ -45,7 +46,9 @@ function makeEnvMap(renderer, colors) {
 // program (face side, instancing, map / alpha test copied from the caster) when some other
 // parameter changes, so which depth variants exist depends on draw order: a pram's double-sided
 // hood drawn right after an instanced mesh compiled a new one mid-game. Stand-ins for every
-// combination, compiled with the level, cover any order.
+// combination, compiled with the level, cover any order. They must cast shadows: drawn only as
+// ordinary meshes they compile the fogged variants, and the shadow pass (no scene, no fog) uses
+// fog-less ones, which then existed only if the level's own casters happened to hit each order.
 let depthStandIns = null;
 function shadowDepthVariants() {
   if (depthStandIns) return depthStandIns;
@@ -59,6 +62,7 @@ function shadowDepthVariants() {
       g.add(new THREE.Mesh(geo, m), new THREE.InstancedMesh(geo, m, 1));
     }
   }
+  for (const c of g.children) c.castShadow = true;
   depthStandIns = g;
   return g;
 }
@@ -180,6 +184,7 @@ export class Game {
     this.builder = L;
     def.build(L, this);
     if (L.missing.size) console.warn('[cobra] missing props:', [...L.missing].join(', '));
+    if (def.accents) scene.add(buildAccents(this.world, L, def.accents));
     if (this.wet) for (const m of L.wetMeshes || []) this.wet.apply(m);
     if (new URLSearchParams(location.search).has('debug')) this.drawColliders();
 
